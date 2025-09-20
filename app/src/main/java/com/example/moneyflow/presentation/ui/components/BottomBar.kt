@@ -1,8 +1,11 @@
 package com.example.moneyflow.presentation.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -35,23 +38,18 @@ fun BottomBar(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    // 🎨 Splash-inspired colors
-    val gradientBackground = Brush.verticalGradient(
-        colors = listOf(
-            Color(0xFFF9FFF9), // White with green tint
-            Color(0xFFE8F5E9)  // Very light green
-        )
-    )
-
-    val selectedColor = Color(0xFF2E7D32)   // Deep green
-    val unselectedColor = Color(0xFF757575) // Muted gray
+    // 🎨 Beautiful Clean White Background
+    val selectedColor = Color(0xFF66BB6A)     // Darker light green for selected
+    val unselectedColor = Color(0xFF9E9E9E)   // Soft gray for unselected
+    val selectedIndicatorColor = Color(0xFFF1F8E9) // Very light green indicator
 
     NavigationBar(
         modifier = Modifier
-            .height(if (isTablet) 80.dp else 70.dp)
-            .background(brush = gradientBackground),
-        containerColor = Color.Transparent,
-        tonalElevation = 4.dp
+            .height(if (isTablet) 85.dp else 75.dp)
+            .fillMaxWidth(),
+        containerColor = Color.White, // Pure white background
+        tonalElevation = 12.dp, // Increased elevation for better shadow
+        windowInsets = WindowInsets(0)
     ) {
         items.forEach { item ->
             val selected = currentRoute == item.route
@@ -75,21 +73,22 @@ fun BottomBar(
                         contentDescription = item.label,
                         tint = if (selected) selectedColor else unselectedColor,
                         modifier = Modifier
-                            .padding(top = if (isTablet) 6.dp else 4.dp)
-                            .height(if (isTablet) 28.dp else 24.dp)
+                            .padding(top = if (isTablet) 8.dp else 6.dp)
+                            .size(if (isTablet) 26.dp else 22.dp)
                     )
                 },
                 label = {
                     Text(
                         text = item.label,
-                        fontSize = if (isTablet) 14.sp else 12.sp,
+                        fontSize = if (isTablet) 13.sp else 11.sp,
                         fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                        color = if (selected) selectedColor else unselectedColor
+                        color = if (selected) selectedColor else unselectedColor,
+                        maxLines = 1
                     )
                 },
                 alwaysShowLabel = true,
                 colors = NavigationBarItemDefaults.colors(
-                    indicatorColor = Color.Transparent,
+                    indicatorColor = selectedIndicatorColor, // Light green indicator
                     selectedIconColor = selectedColor,
                     unselectedIconColor = unselectedColor,
                     selectedTextColor = selectedColor,

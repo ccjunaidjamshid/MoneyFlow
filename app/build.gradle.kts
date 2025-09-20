@@ -56,6 +56,7 @@ dependencies {
     // Room dependencies
     implementation("androidx.room:room-runtime:2.6.0")
     implementation("androidx.room:room-ktx:2.6.0")
+    implementation(libs.androidx.media3.common.ktx)
     kapt("androidx.room:room-compiler:2.6.0")
     
     // Dagger Hilt dependencies
@@ -68,6 +69,9 @@ dependencies {
     
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    
+    // Compose Charts
+    implementation("io.github.ehsannarmani:compose-charts:0.0.13")
     
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

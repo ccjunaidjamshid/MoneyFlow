@@ -42,19 +42,19 @@ import com.example.moneyflow.ui.theme.AccountIcons
 import java.text.NumberFormat
 import java.util.*
 
-// Consistent Color Palette - Same as HomeScreen
+// Beautiful Light Green Color Palette - Same as HomeScreen
 object AppColors {
-    val Primary = Color(0xFF2E7D32) // Dark green
-    val PrimaryVariant = Color(0xFF388E3C) // Deep green
-    val Secondary = Color(0xFF4CAF50) // Medium green
-    val SecondaryLight = Color(0xFF66BB6A) // Light green
-    val Accent = Color(0xFFA8E6CF) // Light mint green
-    val Background = Color(0xFFF5F8F5) // Light neutral background
+    val Primary = Color(0xFF81C784) // Light green
+    val PrimaryVariant = Color(0xFF66BB6A) // Slightly darker light green
+    val Secondary = Color(0xFFA5D6A7) // Very light green
+    val SecondaryLight = Color(0xFFC8E6C9) // Ultra light green
+    val Accent = Color(0xFFC8E6C9) // Very light green accent
+    val Background = Color.White // Pure white background
     val Surface = Color.White
     val OnSurface = Color(0xFF1B1B1B)
     val TextSecondary = Color(0xFF5F6368)
-    val Error = Color(0xFFE57373)
-    val Success = Color(0xFF81C784)
+    val Error = Color(0xFFEF9A9A) // Light red for errors
+    val Success = Color(0xFF81C784) // Light green for success
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)

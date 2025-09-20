@@ -1,21 +1,29 @@
 package com.example.moneyflow.presentation.ui.screens.transaction
 
 import android.app.DatePickerDialog
-import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -24,35 +32,29 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.moneyflow.data.model.*
 import com.example.moneyflow.presentation.viewmodel.TransactionViewModel
+import com.example.moneyflow.presentation.ui.theme.AppColors
 import java.text.SimpleDateFormat
 import java.util.*
 
-// Simple, clean color scheme
-object AppColors {
-    val Primary = Color(0xFF2E7D32)
-    val Secondary = Color(0xFF4CAF50)
-    val Background = Color(0xFFFAFAFA)
-    val Surface = Color.White
-    val OnSurface = Color(0xFF1A1A1A)
-    val TextSecondary = Color(0xFF666666)
-    val Error = Color(0xFFD32F2F)
-    val Success = Color(0xFF388E3C)
-    val Divider = Color(0xFFE0E0E0)
-}
-
-// Keep existing icon mapping
+// Icon mapping (unchanged)
 object CategoryIcons {
     fun getIcon(category: Category): ImageVector {
         return when (category.name.lowercase()) {
@@ -72,7 +74,7 @@ object CategoryIcons {
             else -> when (category.type) {
                 CategoryType.INCOME -> Icons.Default.KeyboardArrowUp
                 CategoryType.EXPENSE -> Icons.Default.KeyboardArrowDown
-                CategoryType.SAVINGS -> Icons.Default.MailOutline
+                CategoryType.SAVINGS -> Icons.Default.Star
             }
         }
     }
@@ -80,7 +82,7 @@ object CategoryIcons {
 
 object AccountIcons {
     fun getIcon(account: Account): ImageVector {
-        return when (account.accountType.toString()) {
+        return when (account.accountType.toString().lowercase()) {
             "checking", "current" -> Icons.Default.Star
             "savings" -> Icons.Default.Star
             "credit" -> Icons.Default.Star
@@ -93,587 +95,850 @@ object AccountIcons {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TransactionFormScreen(
-    onNavigateBack: () -> Unit,
+fun TransactionFormDialog(
+    onDismiss: () -> Unit,
     viewModel: TransactionViewModel = hiltViewModel()
 ) {
+    val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val calendar = Calendar.getInstance()
+    val dateFormatter = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+    val configuration = LocalConfiguration.current
+
+    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+    val isTablet = configuration.screenWidthDp >= 600
+
+    // Calculate responsive dimensions
+    val dialogWidth = when {
+        isTablet -> 0.7f
+        isLandscape -> 0.9f
+        else -> 0.95f
+    }
+
+    val dialogMaxHeight = when {
+        isLandscape -> configuration.screenHeightDp.dp - 32.dp
+        else -> configuration.screenHeightDp.dp * 0.85f
+    }
+
+    // Form state
     var amount by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
-    var notes by remember { mutableStateOf("") }
-    var selectedAccount by remember { mutableStateOf<Account?>(null) }
-    var selectedCategory by remember { mutableStateOf<Category?>(null) }
-    var transactionType by remember { mutableStateOf(TransactionType.EXPENSE) }
     var selectedDate by remember { mutableStateOf(Date()) }
-    var isRecurring by remember { mutableStateOf(false) }
-    var recurringFrequency by remember { mutableStateOf<RecurringFrequency?>(null) }
+    var transactionType by remember { mutableStateOf(TransactionType.EXPENSE) }
+    var selectedCategory by remember { mutableStateOf<Category?>(null) }
+    var selectedAccount by remember { mutableStateOf<Account?>(null) }
+    var showDatePicker by remember { mutableStateOf(false) }
 
-    // Validation states
-    var amountError by remember { mutableStateOf<String?>(null) }
-    var descriptionError by remember { mutableStateOf<String?>(null) }
-    var accountError by remember { mutableStateOf<String?>(null) }
-    var categoryError by remember { mutableStateOf<String?>(null) }
-
-    val context = LocalContext.current
-    val uiState by viewModel.uiState.collectAsState()
-    val accounts by viewModel.accounts.collectAsState()
+    // Get data
     val categories by viewModel.categories.collectAsState()
+    val accounts by viewModel.accounts.collectAsState()
 
-    // Auto-detect transaction type based on selected category
-    LaunchedEffect(selectedCategory) {
-        selectedCategory?.let { category ->
-            val newType = when (category.type) {
-                CategoryType.INCOME -> TransactionType.INCOME
-                CategoryType.EXPENSE -> TransactionType.EXPENSE
-                CategoryType.SAVINGS -> TransactionType.TRANSFER
-            }
-            if (newType != transactionType) {
-                transactionType = newType
+    // Filter categories by transaction type
+    val filteredCategories = remember(categories, transactionType) {
+        categories.filter { category ->
+            when (transactionType) {
+                TransactionType.INCOME -> category.type == CategoryType.INCOME
+                TransactionType.EXPENSE -> category.type == CategoryType.EXPENSE
+                TransactionType.TRANSFER -> false
             }
         }
     }
 
-    // Filter categories based on transaction type
-    val filteredCategories = categories.filter {
-        when (transactionType) {
-            TransactionType.EXPENSE -> it.type == CategoryType.EXPENSE
-            TransactionType.INCOME -> it.type == CategoryType.INCOME
-            TransactionType.TRANSFER -> it.type == CategoryType.SAVINGS
+    // Validation
+    var amountError by remember { mutableStateOf<String?>(null) }
+    var categoryError by remember { mutableStateOf<String?>(null) }
+    var accountError by remember { mutableStateOf<String?>(null) }
+
+    fun validateForm(): Boolean {
+        var isValid = true
+
+        if (amount.isBlank() || amount.toDoubleOrNull() == null || amount.toDouble() <= 0) {
+            amountError = "Please enter a valid amount"
+            isValid = false
+        } else {
+            amountError = null
         }
-    }
 
-    // Validation functions
-    fun validateAmount(): Boolean {
-        val amountValue = amount.toDoubleOrNull()
-        amountError = when {
-            amount.isBlank() -> "Amount is required"
-            amountValue == null -> "Invalid amount format"
-            amountValue <= 0 -> "Amount must be greater than 0"
-            amountValue > 999999.99 -> "Amount cannot exceed $999,999.99"
-            else -> null
+        if (selectedCategory == null && transactionType != TransactionType.TRANSFER) {
+            categoryError = "Please select a category"
+            isValid = false
+        } else {
+            categoryError = null
         }
-        return amountError == null
-    }
 
-    fun validateDescription(): Boolean {
-        descriptionError = when {
-            description.isBlank() -> "Description is required"
-            description.length < 3 -> "Description must be at least 3 characters"
-            description.length > 100 -> "Description cannot exceed 100 characters"
-            else -> null
+        if (selectedAccount == null) {
+            accountError = "Please select an account"
+            isValid = false
+        } else {
+            accountError = null
         }
-        return descriptionError == null
+
+        return isValid
     }
 
-    fun validateAccount(): Boolean {
-        accountError = if (selectedAccount == null) "Please select an account" else null
-        return accountError == null
-    }
-
-    fun validateCategory(): Boolean {
-        categoryError = if (selectedCategory == null) "Please select a category" else null
-        return categoryError == null
-    }
-
-    fun validateAll(): Boolean {
-        return validateAmount() && validateDescription() && validateAccount() && validateCategory()
-    }
-
+    // Handle success
     LaunchedEffect(uiState.successMessage) {
         if (uiState.successMessage != null) {
             viewModel.clearSuccessMessage()
-            onNavigateBack()
+            onDismiss()
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(AppColors.Background)
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
     ) {
-        // Clean header
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = AppColors.Surface
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.5f)),
+            contentAlignment = Alignment.Center
         ) {
-            Row(
+            Card(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onNavigateBack) {
-                    Icon(
-                        Icons.Default.ArrowBack,
-                        contentDescription = "Back",
-                        tint = AppColors.OnSurface
-                    )
-                }
-
-                Text(
-                    text = "Add Transaction",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = AppColors.OnSurface
-                )
-
-                Button(
-                    onClick = {
-                        if (validateAll()) {
-                            val amountValue = amount.toDoubleOrNull()!!
-                            viewModel.createTransaction(
-                                accountId = selectedAccount!!.id,
-                                categoryId = selectedCategory!!.id,
-                                amount = amountValue,
-                                type = transactionType,
-                                description = description.trim(),
-                                notes = if (notes.isBlank()) null else notes.trim(),
-                                transactionDate = selectedDate,
-                                location = null,
-                                tags = null
-                            )
-                        }
-                    },
-                    enabled = !uiState.isLoading,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = AppColors.Primary
+                    .fillMaxWidth(dialogWidth)
+                    .heightIn(max = dialogMaxHeight)
+                    .padding(if (isTablet) 24.dp else 16.dp)
+                    .shadow(
+                        elevation = 24.dp,
+                        shape = RoundedCornerShape(28.dp),
+                        ambientColor = Color.Black.copy(alpha = 0.1f),
+                        spotColor = Color.Black.copy(alpha = 0.1f)
                     ),
-                    modifier = Modifier.height(40.dp)
-                ) {
-                    if (uiState.isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            color = Color.White,
-                            strokeWidth = 2.dp
-                        )
+                shape = RoundedCornerShape(28.dp),
+                colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    // Enhanced Header with gradient
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = Color.Transparent,
+                        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    brush = Brush.horizontalGradient(
+                                        colors = listOf(
+                                            AppColors.Primary,
+                                            AppColors.Primary.copy(alpha = 0.8f)
+                                        )
+                                    ),
+                                    shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+                                )
+                                .padding(
+                                    horizontal = if (isTablet) 32.dp else 24.dp,
+                                    vertical = if (isTablet) 28.dp else 24.dp
+                                )
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(
+                                        text = "Add Transaction",
+                                        fontSize = if (isTablet) 24.sp else 22.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                    Text(
+                                        text = "Track your financial activity",
+                                        fontSize = if (isTablet) 16.sp else 14.sp,
+                                        color = Color.White.copy(alpha = 0.8f),
+                                        fontWeight = FontWeight.Normal
+                                    )
+                                }
+                                IconButton(
+                                    onClick = onDismiss,
+                                    modifier = Modifier
+                                        .size(if (isTablet) 48.dp else 40.dp)
+                                        .background(
+                                            Color.White.copy(alpha = 0.1f),
+                                            CircleShape
+                                        )
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Close",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(if (isTablet) 24.dp else 20.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Scrollable Content
+                    if (isLandscape && !isTablet) {
+                        // Horizontal layout for landscape phones
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                                .padding(20.dp)
+                        ) {
+                            // Left column
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .verticalScroll(rememberScrollState()),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                ErrorSection(uiState.error)
+                                TransactionTypeSection(transactionType) { newType ->
+                                    transactionType = newType
+                                    selectedCategory = null
+                                }
+                                if (transactionType != TransactionType.TRANSFER) {
+                                    CategoriesSection(
+                                        filteredCategories = filteredCategories,
+                                        selectedCategory = selectedCategory,
+                                        transactionType = transactionType,
+                                        categoryError = categoryError,
+                                        onCategorySelect = { selectedCategory = it },
+                                        isTablet = false,
+                                        useGrid = true
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.width(16.dp))
+
+                            // Right column
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .verticalScroll(rememberScrollState()),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                AccountsSection(
+                                    accounts = accounts,
+                                    selectedAccount = selectedAccount,
+                                    accountError = accountError,
+                                    onAccountSelect = { selectedAccount = it },
+                                    isTablet = false,
+                                    useGrid = true
+                                )
+                                FormFieldsSection(
+                                    amount = amount,
+                                    onAmountChange = { amount = it },
+                                    amountError = amountError,
+                                    description = description,
+                                    onDescriptionChange = { description = it },
+                                    selectedDate = selectedDate,
+                                    dateFormatter = dateFormatter,
+                                    onDateClick = { showDatePicker = true },
+                                    isTablet = false
+                                )
+                                SubmitButtonSection(
+                                    isLoading = uiState.isLoading,
+                                    onSubmit = {
+                                        if (validateForm()) {
+                                            viewModel.createTransaction(
+                                                accountId = selectedAccount?.id ?: 0L,
+                                                categoryId = if (transactionType != TransactionType.TRANSFER) selectedCategory?.id ?: 0L else 0L,
+                                                amount = amount.toDouble(),
+                                                type = transactionType,
+                                                description = description.ifBlank { null },
+                                                notes = null,
+                                                transactionDate = selectedDate,
+                                                location = null,
+                                                tags = null
+                                            )
+                                        }
+                                    },
+                                    isTablet = false
+                                )
+                            }
+                        }
                     } else {
-                        Text("Save", fontSize = 14.sp)
+                        // Vertical layout for portrait and tablets
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                                .padding(if (isTablet) 32.dp else 20.dp),
+                            verticalArrangement = Arrangement.spacedBy(if (isTablet) 24.dp else 16.dp)
+                        ) {
+                            item { ErrorSection(uiState.error) }
+
+                            item {
+                                TransactionTypeSection(transactionType) { newType ->
+                                    transactionType = newType
+                                    selectedCategory = null
+                                }
+                            }
+
+                            if (transactionType != TransactionType.TRANSFER) {
+                                item {
+                                    CategoriesSection(
+                                        filteredCategories = filteredCategories,
+                                        selectedCategory = selectedCategory,
+                                        transactionType = transactionType,
+                                        categoryError = categoryError,
+                                        onCategorySelect = { selectedCategory = it },
+                                        isTablet = isTablet,
+                                        useGrid = isTablet
+                                    )
+                                }
+                            }
+
+                            item {
+                                AccountsSection(
+                                    accounts = accounts,
+                                    selectedAccount = selectedAccount,
+                                    accountError = accountError,
+                                    onAccountSelect = { selectedAccount = it },
+                                    isTablet = isTablet,
+                                    useGrid = isTablet
+                                )
+                            }
+
+                            item {
+                                FormFieldsSection(
+                                    amount = amount,
+                                    onAmountChange = { amount = it },
+                                    amountError = amountError,
+                                    description = description,
+                                    onDescriptionChange = { description = it },
+                                    selectedDate = selectedDate,
+                                    dateFormatter = dateFormatter,
+                                    onDateClick = { showDatePicker = true },
+                                    isTablet = isTablet
+                                )
+                            }
+
+                            item {
+                                SubmitButtonSection(
+                                    isLoading = uiState.isLoading,
+                                    onSubmit = {
+                                        if (validateForm()) {
+                                            viewModel.createTransaction(
+                                                accountId = selectedAccount?.id ?: 0L,
+                                                categoryId = if (transactionType != TransactionType.TRANSFER) selectedCategory?.id ?: 0L else 0L,
+                                                amount = amount.toDouble(),
+                                                type = transactionType,
+                                                description = description.ifBlank { null },
+                                                notes = null,
+                                                transactionDate = selectedDate,
+                                                location = null,
+                                                tags = null
+                                            )
+                                        }
+                                    },
+                                    isTablet = isTablet
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
+    }
 
-        // Error messages
-        uiState.error?.let { error ->
+    // Date picker dialog
+    if (showDatePicker) {
+        DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                val calendar = Calendar.getInstance()
+                calendar.set(year, month, dayOfMonth)
+                selectedDate = calendar.time
+                showDatePicker = false
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        ).apply {
+            show()
+        }
+    }
+}
+
+@Composable
+private fun ErrorSection(error: String?) {
+    AnimatedVisibility(
+        visible = error != null,
+        enter = slideInVertically() + fadeIn(),
+        exit = slideOutVertically() + fadeOut()
+    ) {
+        error?.let {
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
+                modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
                     containerColor = AppColors.Error.copy(alpha = 0.1f)
-                )
+                ),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, AppColors.Error.copy(alpha = 0.3f))
             ) {
                 Row(
                     modifier = Modifier.padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        Icons.Default.Warning,
+                        imageVector = Icons.Default.Warning,
                         contentDescription = null,
                         tint = AppColors.Error,
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = error,
+                        text = it,
                         color = AppColors.Error,
-                        fontSize = 14.sp
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium
                     )
                 }
             }
         }
+    }
+}
 
-        // Form content
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+@Composable
+private fun TransactionTypeSection(
+    transactionType: TransactionType,
+    onTypeChange: (TransactionType) -> Unit
+) {
+    Column {
+        Text(
+            text = "Transaction Type",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = AppColors.OnSurface,
+            modifier = Modifier.padding(bottom = 12.dp)
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Amount and description
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = AppColors.Surface)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp)
-                    ) {
+            TransactionType.values().forEach { type ->
+                val isSelected = transactionType == type
+                FilterChip(
+                    onClick = { onTypeChange(type) },
+                    label = {
                         Text(
-                            text = "Transaction Details",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = AppColors.OnSurface
+                            text = type.name.lowercase().replaceFirstChar { it.uppercase() },
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
                         )
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        OutlinedTextField(
-                            value = amount,
-                            onValueChange = { newValue ->
-                                if (newValue.isEmpty() || newValue.matches(Regex("^\\d*\\.?\\d*$"))) {
-                                    amount = newValue
-                                    if (amountError != null) validateAmount()
-                                }
-                            },
-                            label = { Text("Amount") },
-                            leadingIcon = {
-                                Icon(
-                                    Icons.Default.MailOutline,
-                                    contentDescription = null,
-                                    tint = AppColors.Primary
-                                )
-                            },
-                            isError = amountError != null,
-                            supportingText = amountError?.let { { Text(it, color = AppColors.Error) } },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
+                    },
+                    selected = isSelected,
+                    enabled = true,
+                    modifier = Modifier.weight(1f),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = AppColors.Primary.copy(alpha = 0.2f),
+                        selectedLabelColor = AppColors.Primary
+                    ),
+                    border = if (isSelected) {
+                        FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = true,
+                            borderColor = AppColors.Primary,
+                            selectedBorderColor = AppColors.Primary
                         )
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        OutlinedTextField(
-                            value = description,
-                            onValueChange = {
-                                description = it
-                                if (descriptionError != null) validateDescription()
-                            },
-                            label = { Text("Description") },
-                            leadingIcon = {
-                                Icon(
-                                    Icons.Default.Email,
-                                    contentDescription = null,
-                                    tint = AppColors.Primary
-                                )
-                            },
-                            isError = descriptionError != null,
-                            supportingText = descriptionError?.let { { Text(it, color = AppColors.Error) } },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
+                    } else {
+                        FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = false,
+                            borderColor = AppColors.OnSurface.copy(alpha = 0.3f)
                         )
                     }
-                }
+                )
             }
+        }
+    }
+}
 
-            // Date and notes
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = AppColors.Surface)
+@Composable
+private fun CategoriesSection(
+    filteredCategories: List<Category>,
+    selectedCategory: Category?,
+    transactionType: TransactionType,
+    categoryError: String?,
+    onCategorySelect: (Category) -> Unit,
+    isTablet: Boolean,
+    useGrid: Boolean
+) {
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Categories",
+                fontSize = if (isTablet) 18.sp else 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = AppColors.OnSurface
+            )
+
+            if (filteredCategories.isNotEmpty()) {
+                Text(
+                    text = "${filteredCategories.size} available",
+                    fontSize = if (isTablet) 14.sp else 12.sp,
+                    color = AppColors.OnSurface.copy(alpha = 0.6f)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        if (filteredCategories.isEmpty()) {
+            EmptyStateCard(
+                icon = Icons.Default.Warning,
+                title = "No categories available for ${transactionType.name.lowercase()}",
+                subtitle = "Please create a category first",
+                isTablet = isTablet
+            )
+        } else {
+            if (useGrid) {
+                LazyVerticalStaggeredGrid(
+                    columns = StaggeredGridCells.Fixed(if (isTablet) 4 else 3),
+                    modifier = Modifier.heightIn(max = if (isTablet) 300.dp else 200.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalItemSpacing = 12.dp,
+                    contentPadding = PaddingValues(4.dp)
                 ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp)
-                    ) {
-                        Text(
-                            text = "Date & Notes",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = AppColors.OnSurface
-                        )
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        val dateFormat = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
-
-                        OutlinedTextField(
-                            value = dateFormat.format(selectedDate),
-                            onValueChange = { },
-                            label = { Text("Date") },
-                            leadingIcon = {
-                                Icon(
-                                    Icons.Default.DateRange,
-                                    contentDescription = null,
-                                    tint = AppColors.Primary
-                                )
-                            },
-                            trailingIcon = {
-                                IconButton(
-                                    onClick = {
-                                        val calendar = Calendar.getInstance()
-                                        calendar.time = selectedDate
-                                        DatePickerDialog(
-                                            context,
-                                            { _, year, month, dayOfMonth ->
-                                                val newCalendar = Calendar.getInstance()
-                                                newCalendar.set(year, month, dayOfMonth)
-                                                selectedDate = newCalendar.time
-                                            },
-                                            calendar.get(Calendar.YEAR),
-                                            calendar.get(Calendar.MONTH),
-                                            calendar.get(Calendar.DAY_OF_MONTH)
-                                        ).show()
-                                    }
-                                ) {
-                                    Icon(
-                                        Icons.Default.Edit,
-                                        contentDescription = "Select date",
-                                        tint = AppColors.Primary
-                                    )
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            enabled = false,
-                            readOnly = true
-                        )
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        OutlinedTextField(
-                            value = notes,
-                            onValueChange = { if (it.length <= 200) notes = it },
-                            label = { Text("Notes (Optional)") },
-                            leadingIcon = {
-                                Icon(
-                                    Icons.Default.Edit,
-                                    contentDescription = null,
-                                    tint = AppColors.Primary
-                                )
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            maxLines = 3
+                    items(filteredCategories) { category ->
+                        CategoryItem(
+                            category = category,
+                            isSelected = selectedCategory?.id == category.id,
+                            onClick = { onCategorySelect(category) },
+                            isTablet = isTablet
                         )
                     }
                 }
-            }
-
-            // Transaction type and category
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = AppColors.Surface)
+            } else {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(horizontal = 4.dp)
                 ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp)
-                    ) {
-                        Text(
-                            text = "Category",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = AppColors.OnSurface
+                    items(filteredCategories) { category ->
+                        CategoryItem(
+                            category = category,
+                            isSelected = selectedCategory?.id == category.id,
+                            onClick = { onCategorySelect(category) },
+                            isTablet = isTablet
                         )
-
-                        if (categoryError != null) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = categoryError!!,
-                                color = AppColors.Error,
-                                fontSize = 12.sp
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // Transaction type buttons
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            TransactionType.values().forEach { type ->
-                                val isSelected = transactionType == type
-
-                                FilterChip(
-                                    onClick = {
-                                        transactionType = type
-                                        selectedCategory = null
-                                    },
-                                    label = { Text(type.name.lowercase().replaceFirstChar { it.uppercase() }) },
-                                    selected = isSelected,
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        if (filteredCategories.isEmpty()) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(100.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Icon(
-                                        Icons.Default.Edit,
-                                        contentDescription = null,
-                                        tint = AppColors.TextSecondary,
-                                        modifier = Modifier.size(32.dp)
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        "No categories available",
-                                        color = AppColors.TextSecondary,
-                                        fontSize = 14.sp
-                                    )
-                                }
-                            }
-                        } else {
-                            // Enhanced grid-like layout for categories
-                            LazyRow(
-                                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                contentPadding = PaddingValues(horizontal = 8.dp)
-                            ) {
-                                items(filteredCategories) { category ->
-                                    CategoryItem(
-                                        category = category,
-                                        isSelected = selectedCategory?.id == category.id,
-                                        onClick = {
-                                            selectedCategory = category
-                                            if (categoryError != null) validateCategory()
-                                        }
-                                    )
-                                }
-                            }
-                        }
                     }
                 }
             }
+        }
 
-            // Account selection
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = AppColors.Surface)
+        categoryError?.let {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = it,
+                color = AppColors.Error,
+                fontSize = if (isTablet) 14.sp else 12.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}
+
+@Composable
+private fun AccountsSection(
+    accounts: List<Account>,
+    selectedAccount: Account?,
+    accountError: String?,
+    onAccountSelect: (Account) -> Unit,
+    isTablet: Boolean,
+    useGrid: Boolean
+) {
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Accounts",
+                fontSize = if (isTablet) 18.sp else 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = AppColors.OnSurface
+            )
+
+            if (accounts.isNotEmpty()) {
+                Text(
+                    text = "${accounts.size} available",
+                    fontSize = if (isTablet) 14.sp else 12.sp,
+                    color = AppColors.OnSurface.copy(alpha = 0.6f)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        if (accounts.isEmpty()) {
+            EmptyStateCard(
+                icon = Icons.Default.AccountBox,
+                title = "No accounts available",
+                subtitle = "Please create an account first",
+                isTablet = isTablet
+            )
+        } else {
+            if (useGrid) {
+                LazyVerticalStaggeredGrid(
+                    columns = StaggeredGridCells.Fixed(if (isTablet) 4 else 3),
+                    modifier = Modifier.heightIn(max = if (isTablet) 300.dp else 200.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalItemSpacing = 12.dp,
+                    contentPadding = PaddingValues(4.dp)
                 ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp)
-                    ) {
-                        Text(
-                            text = "Account",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = AppColors.OnSurface
+                    items(accounts) { account ->
+                        AccountItem(
+                            account = account,
+                            isSelected = selectedAccount?.id == account.id,
+                            onClick = { onAccountSelect(account) },
+                            isTablet = isTablet
                         )
-
-                        if (accountError != null) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = accountError!!,
-                                color = AppColors.Error,
-                                fontSize = 12.sp
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        if (accounts.isEmpty()) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(100.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Icon(
-                                        Icons.Default.Star,
-                                        contentDescription = null,
-                                        tint = AppColors.TextSecondary,
-                                        modifier = Modifier.size(32.dp)
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        "No accounts available",
-                                        color = AppColors.TextSecondary,
-                                        fontSize = 14.sp
-                                    )
-                                }
-                            }
-                        } else {
-                            // Enhanced grid-like layout for accounts
-                            LazyRow(
-                                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                contentPadding = PaddingValues(horizontal = 8.dp)
-                            ) {
-                                items(accounts) { account ->
-                                    AccountItem(
-                                        account = account,
-                                        isSelected = selectedAccount?.id == account.id,
-                                        onClick = {
-                                            selectedAccount = account
-                                            if (accountError != null) validateAccount()
-                                        }
-                                    )
-                                }
-                            }
-                        }
                     }
                 }
-            }
-
-            // Recurring transaction
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = AppColors.Surface)
+            } else {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(horizontal = 4.dp)
                 ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Recurring Transaction",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = AppColors.OnSurface
-                            )
-
-                            Switch(
-                                checked = isRecurring,
-                                onCheckedChange = {
-                                    isRecurring = it
-                                    if (!it) {
-                                        recurringFrequency = null
-                                    } else {
-                                        recurringFrequency = RecurringFrequency.MONTHLY
-                                    }
-                                }
-                            )
-                        }
-
-                        AnimatedVisibility(visible = isRecurring) {
-                            Column {
-                                Spacer(modifier = Modifier.height(16.dp))
-
-                                Divider(color = AppColors.Divider)
-
-                                Spacer(modifier = Modifier.height(16.dp))
-
-                                Text(
-                                    text = "Frequency",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = AppColors.OnSurface
-                                )
-
-                                Spacer(modifier = Modifier.height(12.dp))
-
-                                LazyRow(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    items(RecurringFrequency.values().toList()) { frequency ->
-                                        FilterChip(
-                                            onClick = { recurringFrequency = frequency },
-                                            label = {
-                                                Text(frequency.name.lowercase().replaceFirstChar { it.uppercase() })
-                                            },
-                                            selected = recurringFrequency == frequency
-                                        )
-                                    }
-                                }
-                            }
-                        }
+                    items(accounts) { account ->
+                        AccountItem(
+                            account = account,
+                            isSelected = selectedAccount?.id == account.id,
+                            onClick = { onAccountSelect(account) },
+                            isTablet = isTablet
+                        )
                     }
                 }
             }
+        }
+
+        accountError?.let {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = it,
+                color = AppColors.Error,
+                fontSize = if (isTablet) 14.sp else 12.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}
+
+@Composable
+private fun FormFieldsSection(
+    amount: String,
+    onAmountChange: (String) -> Unit,
+    amountError: String?,
+    description: String,
+    onDescriptionChange: (String) -> Unit,
+    selectedDate: Date,
+    dateFormatter: SimpleDateFormat,
+    onDateClick: () -> Unit,
+    isTablet: Boolean
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(if (isTablet) 20.dp else 16.dp)) {
+        // Amount field
+        OutlinedTextField(
+            value = amount,
+            onValueChange = onAmountChange,
+            label = { Text("Amount *") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            isError = amountError != null,
+            modifier = Modifier.fillMaxWidth(),
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.Star,
+                    contentDescription = null,
+                    tint = if (amountError != null) AppColors.Error else AppColors.Primary
+                )
+            },
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = AppColors.Primary,
+                focusedLabelColor = AppColors.Primary,
+                cursorColor = AppColors.Primary,
+                errorBorderColor = AppColors.Error,
+                errorLabelColor = AppColors.Error
+            ),
+            shape = RoundedCornerShape(16.dp)
+        )
+
+        amountError?.let {
+            Text(
+                text = it,
+                color = AppColors.Error,
+                fontSize = if (isTablet) 14.sp else 12.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.padding(start = 16.dp)
+            )
+        }
+
+        // Description field
+        OutlinedTextField(
+            value = description,
+            onValueChange = onDescriptionChange,
+            label = { Text("Description (Optional)") },
+            modifier = Modifier.fillMaxWidth(),
+            maxLines = 3,
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.Star,
+                    contentDescription = null,
+                    tint = AppColors.Primary
+                )
+            },
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = AppColors.Primary,
+                focusedLabelColor = AppColors.Primary,
+                cursorColor = AppColors.Primary
+            ),
+            shape = RoundedCornerShape(16.dp)
+        )
+
+        // Date field
+        OutlinedTextField(
+            value = dateFormatter.format(selectedDate),
+            onValueChange = { },
+            label = { Text("Date") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onDateClick() },
+            enabled = false,
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.Star,
+                    contentDescription = null,
+                    tint = AppColors.Primary
+                )
+            },
+            trailingIcon = {
+                Icon(
+                    imageVector = Icons.Default.DateRange,
+                    contentDescription = "Select date",
+                    tint = AppColors.Primary
+                )
+            },
+            colors = OutlinedTextFieldDefaults.colors(
+                disabledBorderColor = AppColors.Primary.copy(alpha = 0.5f),
+                disabledLabelColor = AppColors.Primary.copy(alpha = 0.7f),
+                disabledTextColor = AppColors.OnSurface
+            ),
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
+}
+
+@Composable
+private fun SubmitButtonSection(
+    isLoading: Boolean,
+    onSubmit: () -> Unit,
+    isTablet: Boolean
+) {
+    Button(
+        onClick = onSubmit,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(if (isTablet) 64.dp else 56.dp),
+        enabled = !isLoading,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = AppColors.Primary,
+            contentColor = Color.White,
+            disabledContainerColor = AppColors.Primary.copy(alpha = 0.6f)
+        ),
+        shape = RoundedCornerShape(16.dp),
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+    ) {
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(if (isTablet) 24.dp else 20.dp),
+                color = Color.White,
+                strokeWidth = 2.dp
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = "Adding Transaction...",
+                fontSize = if (isTablet) 16.sp else 14.sp,
+                fontWeight = FontWeight.Medium
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Default.Add,
+                contentDescription = null,
+                modifier = Modifier.size(if (isTablet) 24.dp else 20.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = "Add Transaction",
+                fontSize = if (isTablet) 18.sp else 16.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
+}
+
+@Composable
+private fun EmptyStateCard(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    isTablet: Boolean
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = AppColors.Error.copy(alpha = 0.05f)
+        ),
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, AppColors.Error.copy(alpha = 0.2f))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(if (isTablet) 32.dp else 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(if (isTablet) 72.dp else 64.dp)
+                    .background(
+                        AppColors.Error.copy(alpha = 0.1f),
+                        CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = AppColors.Error,
+                    modifier = Modifier.size(if (isTablet) 36.dp else 32.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(if (isTablet) 20.dp else 16.dp))
+
+            Text(
+                text = title,
+                color = AppColors.Error,
+                fontSize = if (isTablet) 18.sp else 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = subtitle,
+                color = AppColors.OnSurface.copy(alpha = 0.7f),
+                fontSize = if (isTablet) 16.sp else 14.sp,
+                textAlign = TextAlign.Center,
+                fontWeight = FontWeight.Normal
+            )
         }
     }
 }
@@ -682,84 +947,94 @@ fun TransactionFormScreen(
 private fun CategoryItem(
     category: Category,
     isSelected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    isTablet: Boolean = false
 ) {
-    val categoryColor = when (category.type) {
-        CategoryType.INCOME -> AppColors.Success
-        CategoryType.EXPENSE -> AppColors.Error
-        CategoryType.SAVINGS -> AppColors.Primary
-    }
-
     val scale by animateFloatAsState(
         targetValue = if (isSelected) 1.05f else 1f,
-        animationSpec = tween(200)
+        animationSpec = tween(300),
+        label = "category_scale"
     )
 
+    val itemSize = if (isTablet) 80.dp else 72.dp
+    val iconSize = if (isTablet) 28.dp else 24.dp
+    val borderWidth = if (isSelected) 3.dp else 1.5.dp
+    val borderColor = if (isSelected) AppColors.Primary else AppColors.Primary.copy(alpha = 0.3f)
+
     Column(
-        modifier = Modifier
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
             .scale(scale)
             .clickable { onClick() }
-            .padding(4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Circular category indicator with clean borders
         Box(
+            contentAlignment = Alignment.Center,
             modifier = Modifier
-                .size(64.dp)
-                .clip(CircleShape)
-                .background(
-                    if (isSelected) 
-                        categoryColor 
-                    else 
-                        AppColors.Surface
+                .size(itemSize)
+                .shadow(
+                    elevation = if (isSelected) 8.dp else 2.dp,
+                    shape = CircleShape,
+                    ambientColor = AppColors.Primary.copy(alpha = 0.1f),
+                    spotColor = AppColors.Primary.copy(alpha = 0.2f)
                 )
+                .clip(CircleShape)
                 .border(
-                    width = 2.dp,
-                    color = if (isSelected) categoryColor else categoryColor.copy(alpha = 0.4f),
+                    width = borderWidth,
+                    color = borderColor,
                     shape = CircleShape
-                ),
-            contentAlignment = Alignment.Center
+                )
+                .background(
+                    brush = if (isSelected) {
+                        Brush.radialGradient(
+                            colors = listOf(
+                                AppColors.Primary.copy(alpha = 0.15f),
+                                AppColors.Primary.copy(alpha = 0.05f)
+                            )
+                        )
+                    } else {
+                        Brush.radialGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Color.Transparent
+                            )
+                        )
+                    },
+                    shape = CircleShape
+                )
+                .padding(if (isTablet) 20.dp else 16.dp)
         ) {
             Icon(
-                CategoryIcons.getIcon(category),
-                contentDescription = null,
-                tint = if (isSelected) Color.White else categoryColor,
-                modifier = Modifier.size(28.dp)
+                imageVector = CategoryIcons.getIcon(category),
+                contentDescription = category.name,
+                tint = if (isSelected) AppColors.Primary else AppColors.OnSurface.copy(alpha = 0.7f),
+                modifier = Modifier.size(iconSize)
             )
-            
-            // Clean selection indicator
+
             if (isSelected) {
-                Box(
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = "Selected",
+                    tint = AppColors.Primary,
                     modifier = Modifier
-                        .size(18.dp)
-                        .clip(CircleShape)
-                        .background(Color.White)
-                        .border(1.dp, categoryColor, CircleShape)
-                        .align(Alignment.TopEnd),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Default.Check,
-                        contentDescription = "Selected",
-                        tint = categoryColor,
-                        modifier = Modifier.size(12.dp)
-                    )
-                }
+                        .size(if (isTablet) 20.dp else 16.dp)
+                        .offset(x = (itemSize / 3), y = -(itemSize / 3))
+                        .background(Color.White, CircleShape)
+                )
             }
         }
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        
-        // Category name with better typography
+
+        Spacer(modifier = Modifier.height(if (isTablet) 12.dp else 8.dp))
+
         Text(
             text = category.name,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            color = if (isSelected) categoryColor else AppColors.OnSurface,
+            fontSize = if (isTablet) 14.sp else 12.sp,
+            color = if (isSelected) AppColors.Primary else AppColors.OnSurface.copy(alpha = 0.8f),
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+            textAlign = TextAlign.Center,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.width(72.dp)
+            modifier = Modifier.width(if (isTablet) 100.dp else 90.dp)
         )
     }
 }
@@ -768,87 +1043,139 @@ private fun CategoryItem(
 private fun AccountItem(
     account: Account,
     isSelected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    isTablet: Boolean = false
 ) {
     val scale by animateFloatAsState(
         targetValue = if (isSelected) 1.05f else 1f,
-        animationSpec = tween(200)
+        animationSpec = tween(300),
+        label = "account_scale"
     )
 
+    val itemSize = if (isTablet) 80.dp else 72.dp
+    val iconSize = if (isTablet) 28.dp else 24.dp
+    val borderWidth = if (isSelected) 3.dp else 1.5.dp
+    val borderColor = if (isSelected) AppColors.Primary else AppColors.Primary.copy(alpha = 0.3f)
+
     Column(
-        modifier = Modifier
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
             .scale(scale)
             .clickable { onClick() }
-            .padding(4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Circular account indicator with clean borders
         Box(
+            contentAlignment = Alignment.Center,
             modifier = Modifier
-                .size(64.dp)
-                .clip(CircleShape)
-                .background(
-                    if (isSelected) 
-                        AppColors.Primary 
-                    else 
-                        AppColors.Surface
+                .size(itemSize)
+                .shadow(
+                    elevation = if (isSelected) 8.dp else 2.dp,
+                    shape = CircleShape,
+                    ambientColor = AppColors.Primary.copy(alpha = 0.1f),
+                    spotColor = AppColors.Primary.copy(alpha = 0.2f)
                 )
+                .clip(CircleShape)
                 .border(
-                    width = 2.dp,
-                    color = if (isSelected) AppColors.Primary else AppColors.Primary.copy(alpha = 0.4f),
+                    width = borderWidth,
+                    color = borderColor,
                     shape = CircleShape
-                ),
-            contentAlignment = Alignment.Center
+                )
+                .background(
+                    brush = if (isSelected) {
+                        Brush.radialGradient(
+                            colors = listOf(
+                                AppColors.Primary.copy(alpha = 0.15f),
+                                AppColors.Primary.copy(alpha = 0.05f)
+                            )
+                        )
+                    } else {
+                        Brush.radialGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Color.Transparent
+                            )
+                        )
+                    },
+                    shape = CircleShape
+                )
+                .padding(if (isTablet) 20.dp else 16.dp)
         ) {
             Icon(
-                AccountIcons.getIcon(account),
-                contentDescription = null,
-                tint = if (isSelected) Color.White else AppColors.Primary,
-                modifier = Modifier.size(28.dp)
+                imageVector = AccountIcons.getIcon(account),
+                contentDescription = account.name,
+                tint = if (isSelected) AppColors.Primary else AppColors.OnSurface.copy(alpha = 0.7f),
+                modifier = Modifier.size(iconSize)
             )
-            
-            // Clean selection indicator
+
             if (isSelected) {
-                Box(
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = "Selected",
+                    tint = AppColors.Primary,
                     modifier = Modifier
-                        .size(18.dp)
-                        .clip(CircleShape)
-                        .background(Color.White)
-                        .border(1.dp, AppColors.Primary, CircleShape)
-                        .align(Alignment.TopEnd),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Default.Check,
-                        contentDescription = "Selected",
-                        tint = AppColors.Primary,
-                        modifier = Modifier.size(12.dp)
-                    )
-                }
+                        .size(if (isTablet) 20.dp else 16.dp)
+                        .offset(x = (itemSize / 3), y = -(itemSize / 3))
+                        .background(Color.White, CircleShape)
+                )
             }
         }
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        
-        // Account name with better typography
+
+        Spacer(modifier = Modifier.height(if (isTablet) 12.dp else 8.dp))
+
         Text(
             text = account.name,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            color = if (isSelected) AppColors.Primary else AppColors.OnSurface,
+            fontSize = if (isTablet) 14.sp else 12.sp,
+            color = if (isSelected) AppColors.Primary else AppColors.OnSurface.copy(alpha = 0.8f),
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+            textAlign = TextAlign.Center,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.width(72.dp)
+            modifier = Modifier.width(if (isTablet) 100.dp else 90.dp)
         )
-        
-        // Balance with subtle styling
+
         Text(
-            text = "$${String.format("%.0f", account.balance)}",
-            fontSize = 10.sp,
-            color = if (account.balance >= 0) AppColors.Success.copy(alpha = 0.8f) else AppColors.Error.copy(alpha = 0.8f),
-            fontWeight = FontWeight.Normal,
-            textAlign = TextAlign.Center
+            text = "${String.format("%.2f", account.balance)}",
+            fontSize = if (isTablet) 12.sp else 10.sp,
+            color = if (account.balance >= 0) {
+                AppColors.Success.copy(alpha = 0.8f)
+            } else {
+                AppColors.Error.copy(alpha = 0.8f)
+            },
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .background(
+                    color = if (account.balance >= 0) {
+                        AppColors.Success.copy(alpha = 0.1f)
+                    } else {
+                        AppColors.Error.copy(alpha = 0.1f)
+                    },
+                    shape = RoundedCornerShape(8.dp)
+                )
+                .padding(horizontal = 8.dp, vertical = 2.dp)
         )
+    }
+}
+
+// Backward compatibility wrapper
+@Composable
+fun TransactionFormScreen(
+    onNavigateBack: () -> Unit,
+    viewModel: TransactionViewModel = hiltViewModel()
+) {
+    var showDialog by remember { mutableStateOf(true) }
+
+    if (showDialog) {
+        TransactionFormDialog(
+            onDismiss = {
+                showDialog = false
+                onNavigateBack()
+            },
+            viewModel = viewModel
+        )
+    } else {
+        LaunchedEffect(Unit) {
+            onNavigateBack()
+        }
     }
 }

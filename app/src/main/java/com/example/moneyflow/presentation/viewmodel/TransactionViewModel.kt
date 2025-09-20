@@ -410,4 +410,6 @@ data class TransactionUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val successMessage: String? = null
-)
+) {
+
+}

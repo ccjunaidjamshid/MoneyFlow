@@ -43,21 +43,14 @@ fun MoneyflowTopBar(
             .height(56.dp)
             .shadow(
                 elevation = 4.dp,
-                ambientColor = mintGreenDark.copy(alpha = 0.25f),
-                spotColor = mintGreenDark.copy(alpha = 0.25f)
+                ambientColor = Color.Gray.copy(alpha = 0.15f),
+                spotColor = Color.Gray.copy(alpha = 0.15f)
             ),
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            mintGreenDark.copy(alpha = 0.9f),
-                            mintGreen.copy(alpha = 0.95f)
-                        )
-                    )
-                ),
+                .background(Color.White),
             contentAlignment = Alignment.Center
         ) {
             CenterAlignedTopAppBar(
@@ -66,7 +59,7 @@ fun MoneyflowTopBar(
                         text = "Moneyflow",
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White,
+                        color = Color(0xFF2E7D32), // Use green color for text
                         textAlign = TextAlign.Center,
                         letterSpacing = 1.sp,
                         modifier = Modifier
@@ -76,7 +69,7 @@ fun MoneyflowTopBar(
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = Color.Transparent,
-                    titleContentColor = Color.White
+                    titleContentColor = Color(0xFF2E7D32)
                 )
             )
         }
