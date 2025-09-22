@@ -750,59 +750,10 @@ private fun TransactionGraphSection() {
                     )
                 }
 
-                // Summary Stats - More compact
-                Card(
-                    shape = RoundedCornerShape(14.dp), // Reduced corner radius
-                    colors = CardDefaults.cardColors(containerColor = AppColors.Primary.copy(alpha = 0.05f))
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp), // Reduced padding
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        val stats = generateStats(selectedTimeFilter)
-
-                        StatsItem(
-                            title = "Highest",
-                            value = stats.highest,
-                            icon = Icons.Default.ArrowForward,
-                            color = AppColors.Success
-                        )
-
-                        VerticalDivider(
-                            modifier = Modifier
-                                .height(40.dp) // Reduced height
-                                .width(1.dp),
-                            color = AppColors.Primary.copy(alpha = 0.2f)
-                        )
-
-                        StatsItem(
-                            title = "Average",
-                            value = stats.average,
-                            icon = Icons.Default.Add,
-                            color = AppColors.Primary
-                        )
-
-                        VerticalDivider(
-                            modifier = Modifier
-                                .height(40.dp) // Reduced height
-                                .width(1.dp),
-                            color = AppColors.Primary.copy(alpha = 0.2f)
-                        )
-
-                        StatsItem(
-                            title = "Lowest",
-                            value = stats.lowest,
-                            icon = Icons.Default.ArrowBack,
-                            color = AppColors.ExpenseLight
-                        )
                     }
                 }
             }
         }
-    }
-}
 
 @Composable
 private fun StatsItem(

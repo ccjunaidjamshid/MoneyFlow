@@ -43,6 +43,15 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.EaseInOutCubic
 import kotlin.math.cos
 import kotlin.math.sin
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import com.example.moneyflow.presentation.ui.screens.home.TimeFilter
+import ir.ehsannarmani.compose_charts.LineChart
+import ir.ehsannarmani.compose_charts.models.DrawStyle
+import ir.ehsannarmani.compose_charts.models.Line
 
 // Sample data classes for demonstration
 data class ExpenseCategory(
@@ -60,6 +69,36 @@ data class FinancialSummary(
     val monthlyBudget: Double
 )
 
+data class MonthlyData(
+    val month: String,
+    val income: Double,
+    val expense: Double,
+    val savings: Double
+)
+
+data class BudgetItem(
+    val category: String,
+    val budgeted: Double,
+    val actual: Double,
+    val color: Color
+)
+
+data class TopTransaction(
+    val description: String,
+    val amount: Double,
+    val category: String,
+    val date: String,
+    val color: Color
+)
+
+enum class ChartType {
+    EXPENSE_BREAKDOWN,
+    INCOME_VS_EXPENSE,
+    BUDGET_VS_ACTUAL,
+    SAVINGS_TREND,
+    TOP_TRANSACTIONS
+}
+
 @Composable
 fun AnalysisScreen() {
     val configuration = LocalConfiguration.current
@@ -67,6 +106,7 @@ fun AnalysisScreen() {
     val isTablet = screenWidth >= 600
 
     var isVisible by remember { mutableStateOf(false) }
+    var selectedChart by remember { mutableStateOf(ChartType.EXPENSE_BREAKDOWN) }
 
     LaunchedEffect(Unit) {
         isVisible = true
@@ -78,29 +118,29 @@ fun AnalysisScreen() {
             name = "Food & Dining",
             amount = 1250.0,
             percentage = 35f,
-            color = AppColors.ExpenseLight, // Darker light red
-            icon = { Icon(Icons.Default.Home, null, tint = AppColors.ExpenseLight) }
+            color = AppColors.ExpenseLight,
+            icon = { Icon(Icons.Default.AccountBox, null, tint = AppColors.ExpenseLight) }
         ),
         ExpenseCategory(
             name = "Rent & Housing",
             amount = 1800.0,
             percentage = 40f,
-            color = AppColors.Primary, // Darker light green
+            color = AppColors.Primary,
             icon = { Icon(Icons.Default.Home, null, tint = AppColors.Primary) }
         ),
         ExpenseCategory(
             name = "Transportation",
             amount = 450.0,
             percentage = 15f,
-            color = AppColors.SavingsLight, // Darker light blue
-            icon = { Icon(Icons.Default.CheckCircle, null, tint = AppColors.SavingsLight) }
+            color = AppColors.SavingsLight,
+            icon = { Icon(Icons.Default.ArrowForward, null, tint = AppColors.SavingsLight) }
         ),
         ExpenseCategory(
             name = "Entertainment",
             amount = 300.0,
             percentage = 10f,
-            color = AppColors.Warning, // Darker orange
-            icon = { Icon(Icons.Default.DateRange, null, tint = AppColors.Warning) }
+            color = AppColors.Warning,
+            icon = { Icon(Icons.Default.Star, null, tint = AppColors.Warning) }
         )
     )
 
@@ -109,6 +149,34 @@ fun AnalysisScreen() {
         totalExpenses = 3800.0,
         totalSavings = 1700.0,
         monthlyBudget = 4000.0
+    )
+
+    // Sample monthly data for line chart
+    val monthlyData = listOf(
+        MonthlyData("Jan", 5200.0, 3600.0, 1600.0),
+        MonthlyData("Feb", 5400.0, 3800.0, 1600.0),
+        MonthlyData("Mar", 5300.0, 3700.0, 1600.0),
+        MonthlyData("Apr", 5600.0, 4000.0, 1600.0),
+        MonthlyData("May", 5500.0, 3800.0, 1700.0),
+        MonthlyData("Jun", 5700.0, 3900.0, 1800.0)
+    )
+
+    // Sample budget data
+    val budgetData = listOf(
+        BudgetItem("Food", 1200.0, 1250.0, AppColors.ExpenseLight),
+        BudgetItem("Rent", 1800.0, 1800.0, AppColors.Primary),
+        BudgetItem("Transport", 500.0, 450.0, AppColors.SavingsLight),
+        BudgetItem("Entertainment", 250.0, 300.0, AppColors.Warning),
+        BudgetItem("Others", 250.0, 200.0, Color(0xFF9C27B0))
+    )
+
+    // Sample top transactions
+    val topTransactions = listOf(
+        TopTransaction("Monthly Rent Payment", 1800.0, "Rent", "Jun 1", AppColors.Primary),
+        TopTransaction("Grocery Shopping - Walmart", 245.0, "Food", "Jun 15", AppColors.ExpenseLight),
+        TopTransaction("Gas Station Fill-up", 85.0, "Transport", "Jun 10", AppColors.SavingsLight),
+        TopTransaction("Netflix Subscription", 15.99, "Entertainment", "Jun 1", AppColors.Warning),
+        TopTransaction("Dinner at Restaurant", 120.0, "Food", "Jun 20", AppColors.ExpenseLight)
     )
 
     LazyColumn(
@@ -158,23 +226,695 @@ fun AnalysisScreen() {
             }
         }
 
-
+        item {
+            // Chart Selection Buttons
+            AnimatedVisibility(
+                visible = isVisible,
+                enter = fadeIn(tween(800, delayMillis = 400)) + slideInVertically(
+                    initialOffsetY = { it / 3 }
+                )
+            ) {
+                ChartSelectionButtons(
+                    selectedChart = selectedChart,
+                    onChartSelected = { selectedChart = it },
+                    isTablet = isTablet
+                )
+            }
+        }
 
         item {
-            // Enhanced Expense Breakdown Chart with all details
+            // Dynamic Chart Display
             AnimatedVisibility(
                 visible = isVisible,
                 enter = fadeIn(tween(800, delayMillis = 500)) + slideInVertically(
                     initialOffsetY = { it / 3 }
                 )
             ) {
-                EnhancedExpenseBreakdownCard(expenseCategories, isTablet)
+                Box(
+                    modifier = Modifier.animateContentSize(
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessLow
+                        )
+                    )
+                ) {
+                    when (selectedChart) {
+                        ChartType.EXPENSE_BREAKDOWN -> {
+                            EnhancedExpenseBreakdownCard(expenseCategories, isTablet)
+                        }
+                        ChartType.INCOME_VS_EXPENSE -> {
+                            IncomeVsExpenseCard(monthlyData, isTablet)
+                        }
+                        ChartType.BUDGET_VS_ACTUAL -> {
+                            BudgetVsActualCard(budgetData, isTablet)
+                        }
+                        ChartType.SAVINGS_TREND -> {
+                            SavingsTrendCard(monthlyData, isTablet)
+                        }
+                        ChartType.TOP_TRANSACTIONS -> {
+                            TopTransactionsCard(topTransactions, isTablet)
+                        }
+                    }
+                }
             }
         }
 
         item {
             Spacer(modifier = Modifier.height(24.dp))
         }
+    }
+}
+
+@Composable
+fun ChartSelectionButtons(
+    selectedChart: ChartType,
+    onChartSelected: (ChartType) -> Unit,
+    isTablet: Boolean
+) {
+    Column {
+        Text(
+            text = "Analytics",
+            fontSize = if (isTablet) 20.sp else 18.sp,
+            fontWeight = FontWeight.Bold,
+            color = AppColors.OnSurface,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(horizontal = 4.dp)
+        ) {
+            item {
+                ChartButton(
+                    title = "Expenses",
+                    icon = Icons.Default.Star,
+                    isSelected = selectedChart == ChartType.EXPENSE_BREAKDOWN,
+                    onClick = { onChartSelected(ChartType.EXPENSE_BREAKDOWN) },
+                    isTablet = isTablet
+                )
+            }
+            item {
+                ChartButton(
+                    title = "Trends",
+                    icon = Icons.Default.Star,
+                    isSelected = selectedChart == ChartType.INCOME_VS_EXPENSE,
+                    onClick = { onChartSelected(ChartType.INCOME_VS_EXPENSE) },
+                    isTablet = isTablet
+                )
+            }
+            item {
+                ChartButton(
+                    title = "Budget",
+                    icon = Icons.Default.Star,
+                    isSelected = selectedChart == ChartType.BUDGET_VS_ACTUAL,
+                    onClick = { onChartSelected(ChartType.BUDGET_VS_ACTUAL) },
+                    isTablet = isTablet
+                )
+            }
+            item {
+                ChartButton(
+                    title = "Savings",
+                    icon = Icons.Default.Star,
+                    isSelected = selectedChart == ChartType.SAVINGS_TREND,
+                    onClick = { onChartSelected(ChartType.SAVINGS_TREND) },
+                    isTablet = isTablet
+                )
+            }
+            item {
+                ChartButton(
+                    title = "Top Spends",
+                    icon = Icons.Default.Star,
+                    isSelected = selectedChart == ChartType.TOP_TRANSACTIONS,
+                    onClick = { onChartSelected(ChartType.TOP_TRANSACTIONS) },
+                    isTablet = isTablet
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ChartButton(
+    title: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    isTablet: Boolean
+) {
+    val buttonWidth = if (isTablet) 120.dp else 100.dp
+    val buttonHeight = if (isTablet) 70.dp else 60.dp
+
+    Card(
+        modifier = Modifier
+            .width(buttonWidth)
+            .height(buttonHeight),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = if (isSelected) 8.dp else 4.dp
+        ),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) AppColors.Primary else Color.White
+        ),
+        onClick = onClick
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = if (isSelected) Color.White else AppColors.Primary,
+                modifier = Modifier.size(if (isTablet) 28.dp else 24.dp)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = title,
+                fontSize = if (isTablet) 12.sp else 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = if (isSelected) Color.White else AppColors.OnSurface,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+@Composable
+fun IncomeVsExpenseCard(data: List<MonthlyData>, isTablet: Boolean) {
+    // Time Filter Chips - More compact
+    var selectedTimeFilter by remember { mutableStateOf(TimeFilter.MONTHLY) }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            TimeFilter.values().forEach { filter ->
+                val isSelected = selectedTimeFilter == filter
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = if (isSelected) AppColors.Primary else Color.Transparent,
+                    border = if (!isSelected) BorderStroke(1.dp, AppColors.Primary.copy(alpha = 0.3f)) else null,
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { selectedTimeFilter = filter }
+                ) {
+                    Box(
+                        modifier = Modifier.padding(vertical = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = when(filter) {
+                                TimeFilter.DAILY -> "Daily"
+                                TimeFilter.WEEKLY -> "Weekly"
+                                TimeFilter.MONTHLY -> "Monthly"
+                                TimeFilter.YEARLY -> "Yearly"
+                            },
+                            color = if (isSelected) Color.White else AppColors.Primary,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Chart - Reduced height, compact card
+        val chartData = remember(selectedTimeFilter) {
+            // Map MonthlyData to chartData for compose-charts
+            val filtered = when(selectedTimeFilter) {
+                TimeFilter.DAILY, TimeFilter.WEEKLY, TimeFilter.MONTHLY, TimeFilter.YEARLY -> data
+            }
+            object {
+                val labels = filtered.map { it.month }
+                val incomeValues = filtered.map { it.income }
+                val expenseValues = filtered.map { it.expense }
+            }
+        }
+
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = AppColors.Background),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            LineChart(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+                    .padding(12.dp),
+                data = listOf(
+                    Line(
+                        label = "Income",
+                        values = chartData.incomeValues,
+                        color = SolidColor(AppColors.Primary),
+                        firstGradientFillColor = AppColors.Primary.copy(alpha = 0.4f),
+                        secondGradientFillColor = AppColors.Primary.copy(alpha = 0.05f),
+                        strokeAnimationSpec = tween(2000, easing = EaseInOutCubic),
+                        gradientAnimationDelay = 800,
+                        drawStyle = DrawStyle.Stroke(2.dp),
+                        curvedEdges = true
+                    ),
+                    Line(
+                        label = "Expense",
+                        values = chartData.expenseValues,
+                        color = SolidColor(AppColors.ExpenseLight),
+                        firstGradientFillColor = AppColors.ExpenseLight.copy(alpha = 0.4f),
+                        secondGradientFillColor = AppColors.ExpenseLight.copy(alpha = 0.05f),
+                        strokeAnimationSpec = tween(2000, easing = EaseInOutCubic),
+                        gradientAnimationDelay = 800,
+                        drawStyle = ir.ehsannarmani.compose_charts.models.DrawStyle.Stroke(2.dp),
+                        curvedEdges = true
+                    )
+                ),
+                curvedEdges = true,
+                animationDelay = 500,
+                labelProperties = ir.ehsannarmani.compose_charts.models.LabelProperties(
+                    enabled = true,
+                    labels = chartData.labels
+                ),
+                gridProperties = ir.ehsannarmani.compose_charts.models.GridProperties(
+                    enabled = true,
+                    xAxisProperties = ir.ehsannarmani.compose_charts.models.GridProperties.AxisProperties(
+                        color = SolidColor(AppColors.Primary.copy(alpha = 0.1f)),
+                        thickness = 1.dp
+                    ),
+                    yAxisProperties = ir.ehsannarmani.compose_charts.models.GridProperties.AxisProperties(
+                        color = SolidColor(AppColors.Primary.copy(alpha = 0.1f)),
+                        thickness = 1.dp
+                    )
+                )
+            )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Legend
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            LegendItemHorizontal("Income", AppColors.Primary)
+            LegendItemHorizontal("Expense", AppColors.ExpenseLight)
+        }
+    }
+}
+
+@Composable
+fun BudgetVsActualCard(budgetItems: List<BudgetItem>, isTablet: Boolean) {
+    var animationProgress by remember { mutableStateOf(0f) }
+
+    val animatedProgress = animateFloatAsState(
+        targetValue = animationProgress,
+        animationSpec = tween(durationMillis = 1200),
+        label = "budget_animation"
+    )
+
+    LaunchedEffect(Unit) {
+        animationProgress = 1f
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
+    ) {
+        Column(
+            modifier = Modifier.padding(if (isTablet) 24.dp else 20.dp)
+        ) {
+            Text(
+                text = "Budget vs Actual Spend",
+                fontSize = if (isTablet) 20.sp else 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = AppColors.OnSurface
+            )
+
+            Spacer(modifier = Modifier.height(if (isTablet) 24.dp else 20.dp))
+
+            budgetItems.forEach { item ->
+                BudgetBarItem(item, animatedProgress.value, isTablet)
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+        }
+    }
+}
+
+@Composable
+fun BudgetBarItem(item: BudgetItem, progress: Float, isTablet: Boolean) {
+    val maxAmount = maxOf(item.budgeted, item.actual)
+    val budgetPercentage = (item.budgeted / maxAmount) * progress
+    val actualPercentage = (item.actual / maxAmount) * progress
+
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = item.category,
+                fontSize = if (isTablet) 16.sp else 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = AppColors.OnSurface
+            )
+            Text(
+                text = "$${item.actual.toInt()} / $${item.budgeted.toInt()}",
+                fontSize = if (isTablet) 14.sp else 12.sp,
+                color = if (item.actual > item.budgeted) AppColors.ExpenseLight else AppColors.Primary
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(if (isTablet) 24.dp else 20.dp)
+                .background(Color.Gray.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+        ) {
+            // Budget bar (background)
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(budgetPercentage.toFloat())
+                    .background(
+                        item.color.copy(alpha = 0.3f),
+                        RoundedCornerShape(12.dp)
+                    )
+            )
+
+            // Actual bar (foreground)
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(actualPercentage.toFloat())
+                    .background(
+                        item.color,
+                        RoundedCornerShape(12.dp)
+                    )
+            )
+        }
+    }
+}
+
+@Composable
+fun SavingsTrendCard(data: List<MonthlyData>, isTablet: Boolean) {
+    var animationProgress by remember { mutableStateOf(0f) }
+
+    val animatedProgress = animateFloatAsState(
+        targetValue = animationProgress,
+        animationSpec = tween(durationMillis = 1500),
+        label = "savings_animation"
+    )
+
+    LaunchedEffect(Unit) {
+        animationProgress = 1f
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
+    ) {
+        Column(
+            modifier = Modifier.padding(if (isTablet) 24.dp else 20.dp)
+        ) {
+            Text(
+                text = "Savings Over Time",
+                fontSize = if (isTablet) 20.sp else 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = AppColors.OnSurface
+            )
+
+            Spacer(modifier = Modifier.height(if (isTablet) 24.dp else 20.dp))
+
+            // Area Chart for savings
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(if (isTablet) 280.dp else 240.dp)
+            ) {
+                val canvasWidth = size.width
+                val canvasHeight = size.height
+                val padding = 80f
+                val chartWidth = canvasWidth - (padding * 2)
+                val chartHeight = canvasHeight - (padding * 2)
+
+                val maxValue = data.maxOf { it.savings }
+                val stepX = chartWidth / (data.size - 1)
+
+                // Create path for area fill
+                val path = androidx.compose.ui.graphics.Path()
+                path.moveTo(padding, padding + chartHeight)
+
+                data.forEachIndexed { index, monthData ->
+                    val x = padding + (index * stepX)
+                    val y = padding + chartHeight - ((monthData.savings / maxValue) * chartHeight * animatedProgress.value).toFloat()
+                    path.lineTo(x, y)
+                }
+
+                path.lineTo(padding + chartWidth, padding + chartHeight)
+                path.close()
+
+                // Draw area fill
+                drawPath(
+                    path = path,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            AppColors.SavingsLight.copy(alpha = 0.6f),
+                            AppColors.SavingsLight.copy(alpha = 0.1f)
+                        )
+                    )
+                )
+
+                // Draw line
+                for (i in 0 until data.size - 1) {
+                    val x1 = padding + (i * stepX)
+                    val y1 = padding + chartHeight - ((data[i].savings / maxValue) * chartHeight * animatedProgress.value).toFloat()
+                    val x2 = padding + ((i + 1) * stepX)
+                    val y2 = padding + chartHeight - ((data[i + 1].savings / maxValue) * chartHeight * animatedProgress.value).toFloat()
+
+                    drawLine(
+                        color = AppColors.SavingsLight,
+                        start = androidx.compose.ui.geometry.Offset(x1, y1),
+                        end = androidx.compose.ui.geometry.Offset(x2, y2),
+                        strokeWidth = 4.dp.toPx(),
+                        cap = StrokeCap.Round
+                    )
+                }
+
+                // Draw points
+                data.forEachIndexed { index, monthData ->
+                    val x = padding + (index * stepX)
+                    val y = padding + chartHeight - ((monthData.savings / maxValue) * chartHeight * animatedProgress.value).toFloat()
+
+                    drawCircle(
+                        color = AppColors.SavingsLight,
+                        radius = 6.dp.toPx(),
+                        center = androidx.compose.ui.geometry.Offset(x, y)
+                    )
+                    drawCircle(
+                        color = Color.White,
+                        radius = 4.dp.toPx(),
+                        center = androidx.compose.ui.geometry.Offset(x, y)
+                    )
+                }
+
+                // Draw month labels
+                data.forEachIndexed { index, monthData ->
+                    val x = padding + (index * stepX)
+                    drawContext.canvas.nativeCanvas.apply {
+                        val paint = android.graphics.Paint().apply {
+                            color = Color.Gray.toArgb()
+                            textSize = 32f
+                            textAlign = android.graphics.Paint.Align.CENTER
+                            isAntiAlias = true
+                        }
+                        drawText(
+                            monthData.month,
+                            x,
+                            canvasHeight - 20f,
+                            paint
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Summary
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                Text(
+                    text = "Avg: $${data.map { it.savings }.average().toInt()}",
+                    fontSize = if (isTablet) 16.sp else 14.sp,
+                    color = AppColors.SavingsLight,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = "Total: $${data.sumOf { it.savings }.toInt()}",
+                    fontSize = if (isTablet) 16.sp else 14.sp,
+                    color = AppColors.SavingsLight,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun TopTransactionsCard(transactions: List<TopTransaction>, isTablet: Boolean) {
+    var animationProgress by remember { mutableStateOf(0f) }
+
+    val animatedProgress = animateFloatAsState(
+        targetValue = animationProgress,
+        animationSpec = tween(durationMillis = 1000),
+        label = "transactions_animation"
+    )
+
+    LaunchedEffect(Unit) {
+        animationProgress = 1f
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
+    ) {
+        Column(
+            modifier = Modifier.padding(if (isTablet) 24.dp else 20.dp)
+        ) {
+            Text(
+                text = "Top 5 Expense Transactions",
+                fontSize = if (isTablet) 20.sp else 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = AppColors.OnSurface
+            )
+
+            Spacer(modifier = Modifier.height(if (isTablet) 24.dp else 20.dp))
+
+            val maxAmount = transactions.maxOf { it.amount }
+
+            transactions.forEachIndexed { index, transaction ->
+                AnimatedVisibility(
+                    visible = animatedProgress.value > (index * 0.2f),
+                    enter = fadeIn(tween(500, delayMillis = index * 100)) +
+                            slideInVertically(tween(500, delayMillis = index * 100))
+                ) {
+                    TransactionItem(
+                        transaction = transaction,
+                        maxAmount = maxAmount,
+                        progress = animatedProgress.value,
+                        isTablet = isTablet
+                    )
+                }
+
+                if (index < transactions.size - 1) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TransactionItem(
+    transaction: TopTransaction,
+    maxAmount: Double,
+    progress: Float,
+    isTablet: Boolean
+) {
+    val barProgress = (transaction.amount / maxAmount) * progress
+
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = transaction.description,
+                    fontSize = if (isTablet) 16.sp else 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AppColors.OnSurface,
+                    maxLines = 1
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = transaction.category,
+                        fontSize = if (isTablet) 14.sp else 12.sp,
+                        color = transaction.color,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "• ${transaction.date}",
+                        fontSize = if (isTablet) 12.sp else 10.sp,
+                        color = AppColors.TextSecondary
+                    )
+                }
+            }
+
+            Text(
+                text = "${String.format("%.2f", transaction.amount)}",
+                fontSize = if (isTablet) 18.sp else 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = transaction.color
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Progress bar
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .background(Color.Gray.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(barProgress.toFloat())
+                    .background(
+                        transaction.color.copy(alpha = 0.8f),
+                        RoundedCornerShape(4.dp)
+                    )
+            )
+        }
+    }
+}
+
+@Composable
+fun LegendItemHorizontal(label: String, color: Color) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(16.dp)
+                .background(color, CircleShape)
+        )
+        Text(
+            text = label,
+            fontSize = 14.sp,
+            color = AppColors.OnSurface,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
 
@@ -219,10 +959,10 @@ fun FinancialSummaryCards(summary: FinancialSummary, isTablet: Boolean) {
         item {
             SummaryCard(
                 title = "Total Income",
-                amount = "$${String.format("%.2f", summary.totalIncome)}",
+                amount = "${String.format("%.2f", summary.totalIncome)}",
                 icon = Icons.Default.ArrowForward,
                 gradient = Brush.linearGradient(
-                    colors = listOf(AppColors.Primary, AppColors.Secondary) // Darker light green gradient
+                    colors = listOf(AppColors.Primary, AppColors.Secondary)
                 ),
                 cardHeight = cardHeight,
                 fontSize = fontSize,
@@ -232,10 +972,10 @@ fun FinancialSummaryCards(summary: FinancialSummary, isTablet: Boolean) {
         item {
             SummaryCard(
                 title = "Total Expenses",
-                amount = "$${String.format("%.2f", summary.totalExpenses)}",
+                amount = "${String.format("%.2f", summary.totalExpenses)}",
                 icon = Icons.Default.ArrowBack,
                 gradient = Brush.linearGradient(
-                    colors = listOf(AppColors.ExpenseLight, AppColors.Expense) // Darker light red gradient
+                    colors = listOf(AppColors.ExpenseLight, AppColors.Expense)
                 ),
                 cardHeight = cardHeight,
                 fontSize = fontSize,
@@ -245,10 +985,10 @@ fun FinancialSummaryCards(summary: FinancialSummary, isTablet: Boolean) {
         item {
             SummaryCard(
                 title = "Savings",
-                amount = "$${String.format("%.2f", summary.totalSavings)}",
+                amount = "${String.format("%.2f", summary.totalSavings)}",
                 icon = Icons.Default.ShoppingCart,
                 gradient = Brush.linearGradient(
-                    colors = listOf(AppColors.SavingsLight, AppColors.Savings) // Darker light blue gradient
+                    colors = listOf(AppColors.SavingsLight, AppColors.Savings)
                 ),
                 cardHeight = cardHeight,
                 fontSize = fontSize,
@@ -333,9 +1073,9 @@ fun EnhancedExpenseBreakdownCard(categories: List<ExpenseCategory>, isTablet: Bo
                 fontWeight = FontWeight.Bold,
                 color = AppColors.OnSurface
             )
-            
+
             Spacer(modifier = Modifier.height(if (isTablet) 24.dp else 20.dp))
-            
+
             if (isTablet) {
                 // Tablet layout - side by side
                 Row(
@@ -350,9 +1090,9 @@ fun EnhancedExpenseBreakdownCard(categories: List<ExpenseCategory>, isTablet: Bo
                     ) {
                         EnhancedAnimatedPieChart(categories = categories, isTablet = isTablet)
                     }
-                    
+
                     Spacer(modifier = Modifier.width(32.dp))
-                    
+
                     // Legend
                     Column(
                         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -374,9 +1114,9 @@ fun EnhancedExpenseBreakdownCard(categories: List<ExpenseCategory>, isTablet: Bo
                     ) {
                         EnhancedAnimatedPieChart(categories = categories, isTablet = isTablet)
                     }
-                    
+
                     Spacer(modifier = Modifier.height(24.dp))
-                    
+
                     // Legend
                     Column(
                         modifier = Modifier.fillMaxWidth(),
@@ -476,7 +1216,7 @@ fun EnhancedAnimatedPieChart(categories: List<ExpenseCategory>, isTablet: Boolea
                     )
 
                     drawText(
-                        "$${category.amount.toInt()}",
+                        "${category.amount.toInt()}",
                         labelX,
                         labelY + with(density) { 24.dp.toPx() },
                         detailPaint
@@ -542,7 +1282,7 @@ fun EnhancedAnimatedPieChart(categories: List<ExpenseCategory>, isTablet: Boolea
                 )
 
                 drawText(
-                    "$${categories.sumOf { it.amount }.toInt()}",
+                    "${categories.sumOf { it.amount }.toInt()}",
                     center.x,
                     center.y + with(density) { 8.dp.toPx() },
                     totalPaint
@@ -564,7 +1304,7 @@ fun LegendItem(category: ExpenseCategory) {
                 .size(16.dp)
                 .background(category.color, CircleShape)
         )
-        
+
         Column(
             modifier = Modifier.weight(1f)
         ) {
@@ -575,13 +1315,13 @@ fun LegendItem(category: ExpenseCategory) {
                 fontWeight = FontWeight.SemiBold
             )
             Text(
-                text = "$${String.format("%.0f", category.amount)}",
+                text = "${String.format("%.0f", category.amount)}",
                 fontSize = 12.sp,
                 color = AppColors.TextSecondary,
                 fontWeight = FontWeight.Normal
             )
         }
-        
+
         Text(
             text = "${category.percentage.toInt()}%",
             fontSize = 14.sp,
@@ -590,5 +1330,3 @@ fun LegendItem(category: ExpenseCategory) {
         )
     }
 }
-
-
