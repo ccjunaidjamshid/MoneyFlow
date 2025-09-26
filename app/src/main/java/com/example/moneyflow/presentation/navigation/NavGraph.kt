@@ -10,8 +10,12 @@ import com.example.moneyflow.presentation.ui.screens.analysis.AnalysisScreen
 import com.example.moneyflow.presentation.ui.screens.category.CategoryScreen
 import com.example.moneyflow.presentation.ui.screens.home.HomeScreen
 import com.example.moneyflow.presentation.ui.screens.setbudget.SetBudgetScreen
-import com.example.moneyflow.presentation.ui.screens.transaction.TransactionFormScreen
 import com.example.moneyflow.presentation.ui.splash.SplashScreen
+import com.example.moneyflow.presentation.ui.screens.search.SearchScreen
+import com.example.moneyflow.presentation.ui.screens.history.HistoryScreen
+import com.example.moneyflow.presentation.ui.screens.settings.SettingsScreen
+import com.example.moneyflow.presentation.ui.screens.about.AboutScreen
+import com.example.moneyflow.presentation.ui.screens.export.ExportScreen
 import kotlinx.coroutines.delay
 
 @Composable
@@ -35,12 +39,10 @@ fun AppNavGraph(navController: NavHostController) {
         composable(Screen.SetBudget.route) { SetBudgetScreen() }
         composable(Screen.Category.route) { CategoryScreen() }
         composable(Screen.Account.route) { AccountScreen() }
-        composable(Screen.AddTransaction.route) { 
-            TransactionFormScreen(
-                onNavigateBack = {
-                    navController.navigateUp()
-                }
-            )
-        }
+        composable(Screen.Search.route) { SearchScreen() }
+        composable(Screen.History.route) { HistoryScreen() }
+        composable(Screen.Settings.route) { SettingsScreen() }
+        composable(Screen.About.route) { AboutScreen() }
+        composable(Screen.Export.route) { ExportScreen() }
     }
 }

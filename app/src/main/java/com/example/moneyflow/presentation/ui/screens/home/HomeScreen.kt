@@ -24,6 +24,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.moneyflow.data.model.TransactionType
@@ -48,9 +49,10 @@ fun HomeScreen(
     val screenWidth = configuration.screenWidthDp
     val isTablet = screenWidth >= 600
 
-    // Reduced responsive dimensions
-    val horizontalPadding = if (isTablet) 20.dp else 16.dp
-    val verticalSpacing = if (isTablet) 16.dp else 12.dp
+    // Consistent responsive dimensions
+    val horizontalPadding = if (isTablet) 24.dp else 16.dp
+    val verticalSpacing = if (isTablet) 20.dp else 16.dp
+    val cardPadding = if (isTablet) 24.dp else 20.dp
 
     val currentDate = remember {
         SimpleDateFormat("EEEE, MMM dd, yyyy", Locale.getDefault()).format(Date())
@@ -72,66 +74,88 @@ fun HomeScreen(
             .background(AppColors.Background),
         contentPadding = PaddingValues(
             horizontal = horizontalPadding,
-            vertical = if (isTablet) 16.dp else 12.dp
+            vertical = if (isTablet) 20.dp else 16.dp
         ),
         verticalArrangement = Arrangement.spacedBy(verticalSpacing)
     ) {
         item {
-            // Header Section - Reduced height
+            // Header Section
             AnimatedVisibility(
                 visible = isVisible,
                 enter = fadeIn(tween(800)) + slideInVertically(
                     initialOffsetY = { -it / 2 }
                 )
             ) {
-                HeaderSection(currentDate = currentDate)
+                HeaderSection(
+                    currentDate = currentDate,
+                    isTablet = isTablet
+                )
             }
         }
 
         item {
-            // Main Balance Card - Reduced height
+            // Main Balance Card
             AnimatedVisibility(
                 visible = isVisible,
                 enter = fadeIn(tween(800, delayMillis = 200)) + slideInVertically(
                     initialOffsetY = { it / 3 }
                 )
             ) {
-                MainBalanceCard()
+                MainBalanceCard(
+                    isTablet = isTablet,
+                    cardPadding = cardPadding
+                )
             }
         }
 
         item {
-            // Transaction Graph Section - More compact
+            // Transaction Graph Section
             AnimatedVisibility(
                 visible = isVisible,
                 enter = fadeIn(tween(800, delayMillis = 400)) + slideInVertically(
                     initialOffsetY = { it / 3 }
                 )
             ) {
-                TransactionGraphSection()
+                TransactionGraphSection(
+                    isTablet = isTablet,
+                    cardPadding = cardPadding
+                )
             }
         }
 
         item {
-            // Recent Transactions Section - Compact design
+            // Recent Transactions Section
             AnimatedVisibility(
                 visible = isVisible,
                 enter = fadeIn(tween(800, delayMillis = 600)) + slideInVertically(
                     initialOffsetY = { it / 3 }
                 )
             ) {
-                RecentTransactionsSection(transactions = recentTransactions.take(5))
+                RecentTransactionsSection(
+                    transactions = recentTransactions.take(5),
+                    isTablet = isTablet,
+                    cardPadding = cardPadding
+                )
             }
         }
     }
 }
 
 @Composable
-fun HeaderSection(currentDate: String) {
+fun HeaderSection(
+    currentDate: String,
+    isTablet: Boolean
+) {
+    // Consistent typography sizes
+    val titleSize = if (isTablet) 22.sp else 20.sp
+    val subtitleSize = if (isTablet) 14.sp else 12.sp
+    val iconSize = if (isTablet) 40.dp else 36.dp
+    val iconInternalSize = if (isTablet) 20.dp else 18.dp
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 2.dp), // Reduced padding
+            .padding(vertical = if (isTablet) 4.dp else 2.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -140,28 +164,30 @@ fun HeaderSection(currentDate: String) {
         ) {
             Text(
                 text = "Good Morning!",
-                fontSize = 20.sp, // Reduced from 24sp
+                fontSize = titleSize,
                 color = AppColors.OnSurface,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                lineHeight = titleSize * 1.2
             )
             Text(
                 text = currentDate,
-                fontSize = 12.sp, // Reduced from 14sp
+                fontSize = subtitleSize,
                 color = AppColors.TextSecondary,
-                fontWeight = FontWeight.Medium
+                fontWeight = FontWeight.Medium,
+                lineHeight = subtitleSize * 1.3
             )
         }
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp) // Reduced spacing
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Notification Icon - Smaller
+            // Notification Icon
             Surface(
-                modifier = Modifier.size(36.dp), // Reduced from 44dp
-                shape = RoundedCornerShape(10.dp), // Reduced corner radius
+                modifier = Modifier.size(iconSize),
+                shape = RoundedCornerShape(10.dp),
                 color = AppColors.Surface,
-                shadowElevation = 2.dp, // Reduced elevation
+                shadowElevation = 2.dp,
                 tonalElevation = 1.dp
             ) {
                 Box(
@@ -172,14 +198,14 @@ fun HeaderSection(currentDate: String) {
                         imageVector = Icons.Outlined.Notifications,
                         contentDescription = "Notifications",
                         tint = AppColors.OnSurface,
-                        modifier = Modifier.size(18.dp) // Reduced from 22dp
+                        modifier = Modifier.size(iconInternalSize)
                     )
                 }
             }
 
-            // Profile Icon - Smaller
+            // Profile Icon
             Surface(
-                modifier = Modifier.size(36.dp), // Reduced from 44dp
+                modifier = Modifier.size(iconSize),
                 shape = RoundedCornerShape(10.dp),
                 color = AppColors.Primary,
                 shadowElevation = 2.dp
@@ -192,7 +218,7 @@ fun HeaderSection(currentDate: String) {
                         imageVector = Icons.Default.Person,
                         contentDescription = "Profile",
                         tint = Color.White,
-                        modifier = Modifier.size(18.dp) // Reduced from 22dp
+                        modifier = Modifier.size(iconInternalSize)
                     )
                 }
             }
@@ -201,11 +227,21 @@ fun HeaderSection(currentDate: String) {
 }
 
 @Composable
-fun MainBalanceCard() {
+fun MainBalanceCard(
+    isTablet: Boolean,
+    cardPadding: Dp
+) {
+    // Consistent sizes
+    val cardHeight = if (isTablet) 240.dp else 220.dp
+    val balanceTextSize = if (isTablet) 36.sp else 32.sp
+    val labelTextSize = if (isTablet) 16.sp else 14.sp
+    val smallTextSize = if (isTablet) 14.sp else 12.sp
+    val iconSize = if (isTablet) 24.dp else 20.dp
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(220.dp),
+            .height(cardHeight),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = Color.Transparent
@@ -218,9 +254,9 @@ fun MainBalanceCard() {
                 .background(
                     brush = Brush.horizontalGradient(
                         colors = listOf(
-                            AppColors.Primary, // Darker light green
-                            AppColors.PrimaryVariant, // Darker green
-                            AppColors.Secondary  // Medium light green
+                            AppColors.Primary,
+                            AppColors.PrimaryVariant,
+                            AppColors.Secondary
                         )
                     )
                 )
@@ -228,7 +264,7 @@ fun MainBalanceCard() {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(20.dp),
+                    .padding(cardPadding),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
                 // Header row
@@ -240,15 +276,16 @@ fun MainBalanceCard() {
                     Text(
                         text = "Total Balance",
                         color = Color.White.copy(alpha = 0.9f),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium
+                        fontSize = labelTextSize,
+                        fontWeight = FontWeight.Medium,
+                        lineHeight = labelTextSize * 1.3
                     )
 
                     Icon(
-                        imageVector = Icons.Default.Star ,
+                        imageVector = Icons.Default.Star,
                         contentDescription = "Balance",
                         tint = Color.White.copy(alpha = 0.8f),
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(iconSize)
                     )
                 }
 
@@ -257,8 +294,9 @@ fun MainBalanceCard() {
                     Text(
                         text = "$12,847.50",
                         color = Color.White,
-                        fontSize = 32.sp,
-                        fontWeight = FontWeight.Bold
+                        fontSize = balanceTextSize,
+                        fontWeight = FontWeight.Bold,
+                        lineHeight = balanceTextSize * 1.2
                     )
 
                     Spacer(modifier = Modifier.height(4.dp))
@@ -276,7 +314,8 @@ fun MainBalanceCard() {
                         Text(
                             text = "+2.5% from last month",
                             color = Color.White.copy(alpha = 0.85f),
-                            fontSize = 12.sp
+                            fontSize = smallTextSize,
+                            lineHeight = smallTextSize * 1.3
                         )
                     }
                 }
@@ -290,19 +329,22 @@ fun MainBalanceCard() {
                         label = "Income",
                         amount = "+$5,420",
                         icon = Icons.Default.Star,
-                        iconColor = AppColors.Accent
+                        iconColor = AppColors.Accent,
+                        isTablet = isTablet
                     )
                     FinancialItem(
                         label = "Expenses",
                         amount = "-$3,210",
                         icon = Icons.Default.Star,
-                        iconColor = Color(0xFFFFCDD2)
+                        iconColor = Color(0xFFFFCDD2),
+                        isTablet = isTablet
                     )
                     FinancialItem(
                         label = "Savings",
                         amount = "$2,210",
                         icon = Icons.Default.Star,
-                        iconColor = Color(0xFFFFE082)
+                        iconColor = Color(0xFFFFE082),
+                        isTablet = isTablet
                     )
                 }
             }
@@ -315,11 +357,16 @@ fun FinancialItem(
     label: String,
     amount: String,
     icon: ImageVector,
-    iconColor: Color
+    iconColor: Color,
+    isTablet: Boolean
 ) {
+    val iconSize = if (isTablet) 24.dp else 20.dp
+    val amountTextSize = if (isTablet) 14.sp else 12.sp
+    val labelTextSize = if (isTablet) 11.sp else 9.sp
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(3.dp) // Reduced spacing
+        verticalArrangement = Arrangement.spacedBy(3.dp)
     ) {
         Surface(
             shape = RoundedCornerShape(6.dp),
@@ -330,38 +377,44 @@ fun FinancialItem(
                 contentDescription = label,
                 tint = iconColor,
                 modifier = Modifier
-                    .size(20.dp) // Reduced from 28dp
+                    .size(iconSize)
                     .padding(4.dp)
             )
         }
         Text(
             text = amount,
             color = Color.White,
-            fontSize = 12.sp, // Reduced from 14sp
-            fontWeight = FontWeight.Bold
+            fontSize = amountTextSize,
+            fontWeight = FontWeight.Bold,
+            lineHeight = amountTextSize * 1.3
         )
         Text(
             text = label,
             color = Color.White.copy(alpha = 0.8f),
-            fontSize = 9.sp, // Reduced from 11sp
-            fontWeight = FontWeight.Medium
+            fontSize = labelTextSize,
+            fontWeight = FontWeight.Medium,
+            lineHeight = labelTextSize * 1.3
         )
     }
 }
 
 @Composable
-fun RecentTransactionsSection(transactions: List<TransactionWithDetails>) {
+fun RecentTransactionsSection(
+    transactions: List<TransactionWithDetails>,
+    isTablet: Boolean,
+    cardPadding: Dp
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp), // Reduced corner radius
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp) // Reduced elevation
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp) // Reduced elevation
     ) {
         Column(
-            modifier = Modifier.padding(18.dp), // Reduced padding
-            verticalArrangement = Arrangement.spacedBy(12.dp) // Reduced spacing
+            modifier = Modifier.padding(cardPadding),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Header - More compact
+            // Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -372,13 +425,13 @@ fun RecentTransactionsSection(transactions: List<TransactionWithDetails>) {
                 ) {
                     Text(
                         text = "Recent Transactions",
-                        style = MaterialTheme.typography.titleMedium, // Reduced size
+                        style = if (isTablet) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = AppColors.OnSurface
                     )
                     Text(
                         text = "Your latest financial activity",
-                        style = MaterialTheme.typography.bodySmall, // Reduced size
+                        style = if (isTablet) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodySmall,
                         color = AppColors.TextSecondary
                     )
                 }
@@ -389,21 +442,24 @@ fun RecentTransactionsSection(transactions: List<TransactionWithDetails>) {
                     modifier = Modifier.clickable { /* Navigate to all transactions */ }
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp), // Reduced padding
+                        modifier = Modifier.padding(
+                            horizontal = if (isTablet) 16.dp else 12.dp,
+                            vertical = if (isTablet) 8.dp else 6.dp
+                        ),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text(
                             text = "See All",
                             color = AppColors.Primary,
-                            fontSize = 12.sp, // Reduced from 14sp
+                            fontSize = if (isTablet) 14.sp else 12.sp,
                             fontWeight = FontWeight.SemiBold
                         )
                         Icon(
                             imageVector = Icons.Default.KeyboardArrowRight,
                             contentDescription = "See All",
                             tint = AppColors.Primary,
-                            modifier = Modifier.size(14.dp) // Reduced from 16dp
+                            modifier = Modifier.size(if (isTablet) 16.dp else 14.dp)
                         )
                     }
                 }
@@ -413,26 +469,26 @@ fun RecentTransactionsSection(transactions: List<TransactionWithDetails>) {
             if (transactions.isEmpty()) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp), // Reduced corner radius
+                    shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(containerColor = AppColors.Primary.copy(alpha = 0.05f))
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(24.dp), // Reduced padding
+                            .padding(if (isTablet) 32.dp else 24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(6.dp) // Reduced spacing
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Edit,
                             contentDescription = "No transactions",
                             tint = AppColors.TextSecondary,
-                            modifier = Modifier.size(36.dp) // Reduced from 48dp
+                            modifier = Modifier.size(if (isTablet) 48.dp else 36.dp)
                         )
                         Text(
                             text = "No recent transactions",
                             color = AppColors.TextSecondary,
-                            style = MaterialTheme.typography.titleSmall, // Reduced size
+                            style = if (isTablet) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Medium
                         )
                         Text(
@@ -444,10 +500,13 @@ fun RecentTransactionsSection(transactions: List<TransactionWithDetails>) {
                 }
             } else {
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(10.dp) // Reduced spacing
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     transactions.forEach { transaction ->
-                        TransactionItem(transaction = transaction)
+                        TransactionItem(
+                            transaction = transaction,
+                            isTablet = isTablet
+                        )
                     }
                 }
             }
@@ -456,7 +515,10 @@ fun RecentTransactionsSection(transactions: List<TransactionWithDetails>) {
 }
 
 @Composable
-fun TransactionItem(transaction: TransactionWithDetails) {
+fun TransactionItem(
+    transaction: TransactionWithDetails,
+    isTablet: Boolean
+) {
     val dateFormat = SimpleDateFormat("MMM dd", Locale.getDefault())
 
     val (amountColor, backgroundColor, icon) = when (transaction.transaction.type) {
@@ -483,27 +545,35 @@ fun TransactionItem(transaction: TransactionWithDetails) {
         TransactionType.TRANSFER -> ""
     }
 
+    // Consistent sizing
+    val iconContainerSize = if (isTablet) 44.dp else 36.dp
+    val iconSize = if (isTablet) 24.dp else 18.dp
+    val titleSize = if (isTablet) 16.sp else 14.sp
+    val subtitleSize = if (isTablet) 13.sp else 11.sp
+    val amountSize = if (isTablet) 16.sp else 14.sp
+    val dateSize = if (isTablet) 12.sp else 10.sp
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp), // Reduced corner radius
+        shape = RoundedCornerShape(12.dp),
         color = AppColors.Background,
-        shadowElevation = 1.dp // Reduced elevation
+        shadowElevation = 1.dp
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp), // Reduced padding
+                .padding(if (isTablet) 16.dp else 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(if (isTablet) 16.dp else 12.dp)
             ) {
-                // Category Icon - Smaller
+                // Category Icon
                 Surface(
-                    modifier = Modifier.size(36.dp), // Reduced from 48dp
-                    shape = RoundedCornerShape(10.dp), // Reduced corner radius
+                    modifier = Modifier.size(iconContainerSize),
+                    shape = RoundedCornerShape(10.dp),
                     color = backgroundColor
                 ) {
                     Box(
@@ -514,20 +584,21 @@ fun TransactionItem(transaction: TransactionWithDetails) {
                             imageVector = icon,
                             contentDescription = transaction.category?.name,
                             tint = amountColor,
-                            modifier = Modifier.size(18.dp) // Reduced from 24dp
+                            modifier = Modifier.size(iconSize)
                         )
                     }
                 }
 
-                // Transaction Details - More compact
+                // Transaction Details
                 Column(
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     Text(
                         text = transaction.transaction.description ?: "Unknown Transaction",
-                        fontSize = 14.sp, // Reduced from 16sp
+                        fontSize = titleSize,
                         fontWeight = FontWeight.SemiBold,
-                        color = AppColors.OnSurface
+                        color = AppColors.OnSurface,
+                        lineHeight = titleSize * 1.3
                     )
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -535,41 +606,45 @@ fun TransactionItem(transaction: TransactionWithDetails) {
                     ) {
                         Text(
                             text = transaction.category?.name ?: "Unknown",
-                            fontSize = 11.sp, // Reduced from 13sp
+                            fontSize = subtitleSize,
                             color = AppColors.TextSecondary,
-                            fontWeight = FontWeight.Medium
+                            fontWeight = FontWeight.Medium,
+                            lineHeight = subtitleSize * 1.3
                         )
                         Surface(
-                            modifier = Modifier.size(3.dp), // Reduced from 4dp
+                            modifier = Modifier.size(3.dp),
                             shape = CircleShape,
                             color = AppColors.TextSecondary.copy(alpha = 0.5f)
                         ) {}
                         Text(
                             text = transaction.account?.name ?: "Unknown Account",
-                            fontSize = 11.sp, // Reduced from 13sp
+                            fontSize = subtitleSize,
                             color = AppColors.TextSecondary,
-                            fontWeight = FontWeight.Medium
+                            fontWeight = FontWeight.Medium,
+                            lineHeight = subtitleSize * 1.3
                         )
                     }
                 }
             }
 
-            // Amount and Date - More compact
+            // Amount and Date
             Column(
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
                     text = "$amountPrefix${String.format("%.2f", transaction.transaction.amount)}",
-                    fontSize = 14.sp, // Reduced from 16sp
+                    fontSize = amountSize,
                     fontWeight = FontWeight.Bold,
-                    color = amountColor
+                    color = amountColor,
+                    lineHeight = amountSize * 1.3
                 )
                 Text(
                     text = dateFormat.format(transaction.transaction.createdAt),
-                    fontSize = 10.sp, // Reduced from 12sp
+                    fontSize = dateSize,
                     color = AppColors.TextSecondary,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Medium,
+                    lineHeight = dateSize * 1.3
                 )
             }
         }
@@ -577,7 +652,10 @@ fun TransactionItem(transaction: TransactionWithDetails) {
 }
 
 @Composable
-private fun TransactionGraphSection() {
+private fun TransactionGraphSection(
+    isTablet: Boolean,
+    cardPadding: Dp
+) {
     var selectedTimeFilter by remember { mutableStateOf(TimeFilter.MONTHLY) }
     var isVisible by remember { mutableStateOf(false) }
 
@@ -593,15 +671,15 @@ private fun TransactionGraphSection() {
     ) {
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp), // Reduced corner radius
+            shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
-            elevation = CardDefaults.cardElevation(defaultElevation = 6.dp) // Reduced elevation
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp) // Reduced elevation
         ) {
             Column(
-                modifier = Modifier.padding(18.dp), // Reduced padding
-                verticalArrangement = Arrangement.spacedBy(14.dp) // Reduced spacing
+                modifier = Modifier.padding(cardPadding),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Header - More compact
+                // Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -612,7 +690,7 @@ private fun TransactionGraphSection() {
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
@@ -623,32 +701,35 @@ private fun TransactionGraphSection() {
                                     contentDescription = "Analytics",
                                     tint = AppColors.Primary,
                                     modifier = Modifier
-                                        .size(24.dp) // Reduced from 32dp
+                                        .size(if (isTablet) 32.dp else 24.dp)
                                         .padding(4.dp)
                                 )
                             }
                             Text(
                                 text = "Transaction Analytics",
-                                style = MaterialTheme.typography.titleMedium, // Reduced size
+                                style = if (isTablet) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = AppColors.OnSurface
                             )
                         }
                         Text(
                             text = "Track your spending patterns over time",
-                            style = MaterialTheme.typography.bodySmall, // Reduced size
+                            style = if (isTablet) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodySmall,
                             color = AppColors.TextSecondary
                         )
                     }
 
-                    // Details Button - Smaller
+                    // Details Button
                     Surface(
                         shape = RoundedCornerShape(10.dp),
                         color = AppColors.Primary.copy(alpha = 0.1f),
                         modifier = Modifier.clickable { /* Navigate to details */ }
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), // Reduced padding
+                            modifier = Modifier.padding(
+                                horizontal = if (isTablet) 16.dp else 12.dp,
+                                vertical = if (isTablet) 10.dp else 8.dp
+                            ),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
@@ -656,27 +737,27 @@ private fun TransactionGraphSection() {
                                 imageVector = Icons.Default.AccountCircle,
                                 contentDescription = "View Details",
                                 tint = AppColors.Primary,
-                                modifier = Modifier.size(14.dp) // Reduced from 18dp
+                                modifier = Modifier.size(if (isTablet) 18.dp else 14.dp)
                             )
                             Text(
                                 text = "Details",
                                 color = AppColors.Primary,
-                                style = MaterialTheme.typography.bodySmall, // Reduced size
+                                style = if (isTablet) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodySmall,
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
                     }
                 }
 
-                // Time Filter Chips - More compact
+                // Time Filter Chips
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp) // Reduced spacing
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     TimeFilter.values().forEach { filter ->
                         val isSelected = selectedTimeFilter == filter
                         Surface(
-                            shape = RoundedCornerShape(14.dp), // Reduced corner radius
+                            shape = RoundedCornerShape(14.dp),
                             color = if (isSelected) AppColors.Primary else Color.Transparent,
                             border = if (!isSelected) BorderStroke(1.dp, AppColors.Primary.copy(alpha = 0.3f)) else null,
                             modifier = Modifier
@@ -684,7 +765,7 @@ private fun TransactionGraphSection() {
                                 .clickable { selectedTimeFilter = filter }
                         ) {
                             Box(
-                                modifier = Modifier.padding(vertical = 10.dp), // Reduced padding
+                                modifier = Modifier.padding(vertical = if (isTablet) 12.dp else 10.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
@@ -695,7 +776,7 @@ private fun TransactionGraphSection() {
                                         TimeFilter.YEARLY -> "Yearly"
                                     },
                                     color = if (isSelected) Color.White else AppColors.Primary,
-                                    style = MaterialTheme.typography.bodySmall, // Reduced size
+                                    style = if (isTablet) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodySmall,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                                 )
                             }
@@ -703,20 +784,20 @@ private fun TransactionGraphSection() {
                     }
                 }
 
-                // Chart - Reduced height
+                // Chart
                 val chartData = remember(selectedTimeFilter) {
                     generateChartData(selectedTimeFilter)
                 }
 
                 Card(
-                    shape = RoundedCornerShape(14.dp), // Reduced corner radius
+                    shape = RoundedCornerShape(14.dp),
                     colors = CardDefaults.cardColors(containerColor = AppColors.Background)
                 ) {
                     LineChart(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(200.dp) // Reduced from 260dp
-                            .padding(12.dp), // Reduced padding
+                            .height(if (isTablet) 240.dp else 200.dp)
+                            .padding(if (isTablet) 16.dp else 12.dp),
                         data = listOf(
                             Line(
                                 label = "Transactions",
@@ -726,7 +807,7 @@ private fun TransactionGraphSection() {
                                 secondGradientFillColor = AppColors.Primary.copy(alpha = 0.05f),
                                 strokeAnimationSpec = tween(2000, easing = EaseInOutCubic),
                                 gradientAnimationDelay = 800,
-                                drawStyle = ir.ehsannarmani.compose_charts.models.DrawStyle.Stroke(2.dp), // Reduced stroke
+                                drawStyle = ir.ehsannarmani.compose_charts.models.DrawStyle.Stroke(2.dp),
                                 curvedEdges = true
                             )
                         ),
@@ -749,22 +830,26 @@ private fun TransactionGraphSection() {
                         )
                     )
                 }
-
-                    }
-                }
             }
         }
+    }
+}
 
 @Composable
 private fun StatsItem(
     title: String,
     value: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
-    color: Color
+    color: Color,
+    isTablet: Boolean
 ) {
+    val iconSize = if (isTablet) 32.dp else 24.dp
+    val valueSize = if (isTablet) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium
+    val titleSize = MaterialTheme.typography.bodySmall
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp) // Reduced spacing
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Surface(
             shape = RoundedCornerShape(8.dp),
@@ -775,19 +860,19 @@ private fun StatsItem(
                 contentDescription = title,
                 tint = color,
                 modifier = Modifier
-                    .size(24.dp) // Reduced from 32dp
+                    .size(iconSize)
                     .padding(4.dp)
             )
         }
         Text(
             text = value,
-            style = MaterialTheme.typography.bodyMedium, // Reduced size
+            style = valueSize,
             fontWeight = FontWeight.Bold,
             color = AppColors.OnSurface
         )
         Text(
             text = title,
-            style = MaterialTheme.typography.bodySmall,
+            style = titleSize,
             color = AppColors.TextSecondary,
             fontWeight = FontWeight.Medium
         )
